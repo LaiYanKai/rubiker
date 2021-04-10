@@ -105,6 +105,8 @@ int main (int argc, char **argv)
         r.sleep();
     }
 
+    softPwmWrite(PIN_K, 0);
+    softPwmWrite(PIN_W, 0);
     ros::spin();
     return 0;
 }

@@ -10,3 +10,6 @@ export M3="3 1 12 27 28 0.4 0.05 0.35"
 export M4="4 27 22 12 13 0.4 0.05 0.35"
 # export M4="4 6 13 24 25 0.5 0.05 0.6"
 roslaunch rubiker rubiker.launch
+
+echo "================= RESETING ===================="
+source reset.sh

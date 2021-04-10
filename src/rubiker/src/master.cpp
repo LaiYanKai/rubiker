@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
 
     std_msgs::Int32 msg;
     std::vector<int> targets1 = {-540}; // Wrist 
-    std::vector<int> targets2 = {-720}; // Claw  1/6 {180, -180, 360, -360};
-    std::vector<int> targets3 = {-720}; // Claw 1/6 {180, -180, 360, -360};
+    std::vector<int> targets2 = {720}; // Claw  1/6 {180, -180, 360, -360};
+    std::vector<int> targets3 = {720}; // Claw 1/6 {180, -180, 360, -360};
     std::vector<int> targets4 = {-540}; // Wrist {180, -180, 360, -360};
 
     msg.data = targets1[0];
