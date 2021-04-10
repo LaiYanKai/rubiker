@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="rubiker" type="pid" name="pid1" output="screen" args="$(env M1)"/>
+    <node pkg="rubiker" type="pid" name="pid2" output="screen" args="$(env M2)"/>
+    <node pkg="rubiker" type="pid" name="pid3" output="screen" args="$(env M3)"/>
+    <node pkg="rubiker" type="pid" name="pid4" output="screen" args="$(env M4)"/>
+    <node pkg="rubiker" type="master" name="master" output="screen"/>
+    <node pkg="rubiker" type="tacho" name="tacho1" output="screen" args="$(env M1)"/>
+    <node pkg="rubiker" type="tacho" name="tacho2" output="screen" args="$(env M2)"/>
+    <node pkg="rubiker" type="tacho" name="tacho3" output="screen" args="$(env M3)"/>
+    <node pkg="rubiker" type="tacho" name="tacho4" output="screen" args="$(env M4)"/>
+</launch>

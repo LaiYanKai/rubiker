@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="rubiker" type="pi12" name="pid2" output="screen"/>
+    <node pkg="rubiker" type="tacho1" name="tacho1" output="screen"/>
+</launch>
