@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
     for (auto i : pins_pwm)
     {
        softPwmCreate(i, 0, 100);
-       softPwmWrite(i, 10);
+       softPwmWrite(i, 20);
     }
 
     ros::Duration(5).sleep();
