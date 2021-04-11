@@ -2,7 +2,7 @@
 source devel/setup.bash
 echo "BASH SOURCED"
 
-
+sudo ip ad add 10.0.0.1/24 dev eth0
 # MTR PIN_K(BCM) PIN_W(BCM) PIN_Y(WPI/Name) PIN_B(WPI/Name) KP KI KD
 export M1="1 14 15 1 4 0.4 0.05 0.35"
 export M2="2 8 7 5 6 0.4 0.05 0.35"
