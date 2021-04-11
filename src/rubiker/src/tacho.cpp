@@ -12,7 +12,7 @@ int deg = 0;
 
 bool state_a = false;
 bool state_b = false;
-
+bool changed = true;
 void tacho(bool tac)
 {
    // bool dir = state_a == ((!state_b && tac) || (state_b && !tac));
@@ -23,6 +23,7 @@ void tacho(bool tac)
     }else{
 	deg--;
     }
+    changed = true;
 }
 void handler_a(void)
 {
@@ -43,11 +44,11 @@ int main (int argc, char **argv)
     ros::init(argc, argv, "tacho");
     ros::NodeHandle nh;
     
-    int MTR = strtol(argv[1], nullptr, 0);
-    std::string TOPIC_DEG = "deg" + std::to_string(MTR);
+    std::string MTR(argv[1]);
+    std::string TOPIC_DEG = "deg" + MTR;
     PIN_Y = strtol(argv[4], nullptr, 0);
     PIN_B = strtol(argv[5], nullptr, 0);
-    ROS_INFO("%8s (%02d) --> PIN_Y:%02d  PIN_B:%02d", ros::this_node::getName().c_str(), MTR, PIN_Y, PIN_B);
+    ROS_INFO("%8s --> PIN_Y:%02d  PIN_B:%02d", ros::this_node::getName().c_str(), PIN_Y, PIN_B);
 
     // publish the interrupt (deg) into topic / deg
     ros::Publisher tacho_topic =  nh.advertise<std_msgs::Int32>(TOPIC_DEG, 1, true);
@@ -61,11 +62,14 @@ int main (int argc, char **argv)
     if (wiringPiISR(PIN_B, INT_EDGE_BOTH, &handler_b)  < 0) { ROS_INFO("loser1"); return 1; }
 
     std_msgs::Int32 msg;
-    ros::Rate looper(10);
+    ros::Rate looper(100);
     while (ros::ok())
     {
-	msg.data =  deg;
-	tacho_topic.publish(msg);
+        if (changed) {
+            msg.data =  deg;
+            tacho_topic.publish(msg);
+            changed = false;
+        }
 //        ROS_INFO_STREAM(digitalRead(PIN_Y) <<" ,"<< digitalRead(PIN_B) << " ," << digitalRead(1) << "," << digitalRead(4));
 
         ros::spinOnce();
