@@ -28,6 +28,7 @@
 #define F_TURNOPEN 19
 #define B_TURNOPEN 20
 #define L_CW_R_ACW 21
+#define L_ACW_R_CW 22
 
 int degLW = 0;
 int degRH = 0;
@@ -104,100 +105,402 @@ int main(int argc, char **argv) {
     std::vector<int>states = {};
     for(auto instruction: instructions)
     {
-        if(instruction == 'L'){
-            if(rotated){
-                if(upF){
-                    if(!cF){
-                        states.push_back(F_CLOSE);
-                        cF = !cF;
-                    }
+        if(instruction == 'L'){ 
+            if(!rotated){
+                if(!upL){
+                    states.push_back(L_CW);
+                    upL = !upL;
+                }else if(upF && upB){
+                    states.push_back(L_CW);
+                    upL = !upL;
                 }else{
-                    if(!cF){
-                        states.push_back(F_CW);
-                        upF = !upF;
-                        states.push_back(F_CLOSE);
-                        cF = !cF;
-                    }else{
+                    if(!upF){
                         states.push_back(F_TURNOPEN);
-                        cF = !cF;
                         upF = !upF;
                         states.push_back(F_CLOSE);
-                        cF = !cF;
                     }
-                }
-                if(upB){
-                    if(!cB){
-                        states.push_back(B_CLOSE);
-                        cB = !cB;
-                    }
-                }else{
-                    if(!cB){
-                        states.push_back(B_CW);
-                        upB = !upB;
-                        states.push_back(B_CLOSE);
-                        cB = !cB;
-                    }else{
+                    if(!upB){
                         states.push_back(B_TURNOPEN);
-                        cB = !cB;
                         upB = !upB;
                         states.push_back(B_CLOSE);
-                        cB = !cB;
                     }
-                }if(!upR){
-                    if(!cR){
-                        states.push_back(R_CLOSE);
-                        cR = !cR;
-                    }
+                    states.push_back(L_CW);
+                    upL = !upL;
+                }
+            }else if(rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                if(!upL){
+                    states.push_back(L_CW);
+                    upL = !upL;
+                }else if(upF && upB){
+                    states.push_back(L_CW);
+                    upL = !upL;
                 }else{
-                    if(!cR){
-                        states.push_back(R_CW);
-                        upR = !upR;
-                        states.push_back(R_CLOSE);
-                        cR = !cR;
-                    }else{
-                        states.push_back(R_TURNOPEN);
-                        cR = !cR;
-                        upR = !upR;
-                        states.push_back(R_CLOSE);
-                        cR = !cR;
-                }if(!upL){
-                    if(!cL){
-                        states.push_back(L_CLOSE);
-                        cL = !cL;
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
                     }
-                }else{
-                    if(!cL){
-                        states.push_back(L_CW);
-                        upL = !upL;
-                        states.push_back(L_CLOSE);
-                        cL = !cL;
-                    }else{
-                        states.push_back(L_TURNOPEN);
-                        cL = !cL;
-                        upL = !upL;
-                        states.push_back(L_CLOSE);
-                        cL = !cL;
-                     }
-                  states.push_back(F_OPEN);
-                  cF = !cF;
-                  states.push_back(B_OPEN);
-                  cB = !cB;
-                  states.push_back(L_CW_R_ACW);
-                  upL = !upL;
-                  upR = !upR;
-                  xxx
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(L_CW);
+                    upL = !upL;
+                }
             }
         } else if (instruction == 'l'){
+            if(!rotated){
+                if(!upL){
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }else if(upF && upB){
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }
+            }else if(rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                if(!upL){
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }else if(upF && upB){
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(L_ACW);
+                    upL = !upL;
+                }
+            }
+
         } else if (instruction == 'R'){
+            if(!rotated){
+                if(!upR){
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }else if(upF && upB){
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }
+            }else if(rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                if(!upR){
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }else if(upF && upB){
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }
+
+            }
+
         } else if (instruction == 'r'){
+            if(!rotated){
+                if(!upR){
+                    states.push_back(R_ACW);
+                    upR = !upR;
+                }else if(upF && upB){
+                    states.push_back(R_ACW);
+                    upR = !upR;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(R_ACW);
+                    upR = !upR;
+                }
+            }else if(rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
         } else if (instruction == 'F'){
+            if(!rotated){
+                if(!upR){
+                    states.push_back(F_CW);
+                    upR = !upR;
+                }else if(upF && upB){
+                    states.push_back(F_CW);
+                    upR = !upR;
+                }else{
+                    if(!upF){
+                        states.push_back(F_TURNOPEN);
+                        upF = !upF;
+                        states.push_back(F_CLOSE);
+                    }
+                    if(!upB){
+                        states.push_back(B_TURNOPEN);
+                        upB = !upB;
+                        states.push_back(B_CLOSE);
+                    }
+                    states.push_back(R_CW);
+                    upR = !upR;
+                }
+            }else if(rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
         } else if (instruction == 'f'){
+
         } else if (instruction == 'B'){
+
         } else if (instruction == 'b'){
+
         } else if (instruction == 'T'){
+            if(rotated){
+                states.push_back(F_CW);
+                upF = !upF;
+            }else if (!rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                    states.push_back(F_CLOSE);
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                    states.push_back(B_CLOSE);
+                }
+                if(upL){
+                    states.push_back(L_TURNOPEN);
+                    upL = !upL;
+                    states.push_back(L_CLOSE);
+                }
+                if(upR){
+                    states.push_back(R_TURNOPEN);
+                    upR = !upR;
+                    states.push_back(R_CLOSE);
+                }
+                states.push_back(F_OPEN);
+                states.push_back(B_OPEN);
+                states.push_back(L_CW_R_ACW);
+                upL = !upL;
+                upR = !upR;
+                rotated = !rotated;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                states.push_back(F_CW);
+                upF = !upF;
+                }
         } else if (instruction == 't'){
+            if(rotated){
+                states.push_back(F_ACW);
+                upF = !upF;
+            }else if (!rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                    states.push_back(F_CLOSE);
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                    states.push_back(B_CLOSE);
+                }
+                if(upL){
+                    states.push_back(L_TURNOPEN);
+                    upL = !upL;
+                    states.push_back(L_CLOSE);
+                }
+                if(upR){
+                    states.push_back(R_TURNOPEN);
+                    upR = !upR;
+                    states.push_back(R_CLOSE);
+                }
+                states.push_back(F_OPEN);
+                states.push_back(B_OPEN);
+                states.push_back(L_CW_R_ACW);
+                upL = !upL;
+                upR = !upR;
+                rotated = !rotated;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                states.push_back(F_ACW);
+                upF = !upF;
+                }
         } else if (instruction == 'D'){
+            if(rotated){
+                states.push_back(B_CW);
+                upB = !upB;
+            }else if (!rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                    states.push_back(F_CLOSE);
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                    states.push_back(B_CLOSE);
+                }
+                if(upL){
+                    states.push_back(L_TURNOPEN);
+                    upL = !upL;
+                    states.push_back(L_CLOSE);
+                }
+                if(upR){
+                    states.push_back(R_TURNOPEN);
+                    upR = !upR;
+                    states.push_back(R_CLOSE);
+                }
+                states.push_back(F_OPEN);
+                states.push_back(B_OPEN);
+                states.push_back(L_CW_R_ACW);
+                upL = !upL;
+                upR = !upR;
+                rotated = !rotated;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                states.push_back(B_CW);
+                upB = !upB;
+                }
         } else if (instruction == 'd'){
+            if(rotated){
+                states.push_back(B_ACW);
+                upB = !upB;
+            }else if (!rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                    states.push_back(F_CLOSE);
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                    states.push_back(B_CLOSE);
+                }
+                if(upL){
+                    states.push_back(L_TURNOPEN);
+                    upL = !upL;
+                    states.push_back(L_CLOSE);
+                }
+                if(upR){
+                    states.push_back(R_TURNOPEN);
+                    upR = !upR;
+                    states.push_back(R_CLOSE);
+                }
+                states.push_back(F_OPEN);
+                states.push_back(B_OPEN);
+                states.push_back(L_CW_R_ACW);
+                upL = !upL;
+                upR = !upR;
+                rotated = !rotated;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                states.push_back(B_ACW);
+                upB = !upB;
+                }
         }
     }
 
