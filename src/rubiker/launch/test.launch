@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="rubiker" type="pid" name="pid" output="screen" args="$(env Motor)"/>
+    <node pkg="rubiker" type="tacho" name="tacho" output="screen" args="$(env Motor)"/>
+</launch>

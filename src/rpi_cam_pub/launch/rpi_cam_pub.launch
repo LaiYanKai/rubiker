@@ -1,0 +1,3 @@
+<launch>
+    <node name= "noob" type="rpi_cam_pub" pkg="rpi_cam_pub" output="screen"/>
+</launch>
