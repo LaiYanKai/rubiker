@@ -6,8 +6,18 @@ import cv2
 import numpy as np
 import sys
 import tflite_runtime.interpreter as tflite
+import kociemba
 
-face_requested = True
+#import model
+interpreter = tflite.Interpreter(model_path="/home/ubuntu/catkin_ws/model.tflite")
+interpreter.allocate_tensors()
+tmp = interpreter.get_input_details()
+interpreter_in_idx = tmp[0]['index']
+tmp = interpreter.get_output_details()
+interpreter_out_idx = tmp[0]['index']
+
+
+face_requested = False
 
 def cbFace(msg):
   global face_requested
@@ -17,7 +27,7 @@ def main(gamma, coords):
   rospy.init_node('vision')
   global face_requested
 
-  pub = rospy.Publisher('facelets', String, queue_size=1)
+  pub = rospy.Publisher('instructions', String, queue_size=1)
   sub = rospy.Subscriber('getface', Empty, cbFace)
 
   cap = cv2.VideoCapture(0)
@@ -27,32 +37,100 @@ def main(gamma, coords):
 
   rate = rospy.Rate(5);
  # br = CvBridge()
+  lookUpTable = np.empty((1,256), np.uint8)
+  for i in range(256):
+    lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
 
-  while not rospy.is_shutdown():
-    if face_requested:
-      rospy.loginfo("Face requested and captured")
-      for i in range(10):
-        success, bgr_frame = cap.read()
-        if success:
+  color_to_pos = ['', '', '', '', '', '']
+  colors = [[0 for j in range(9)] for i in range(6)]
 
+  pos = ['U', 'R', 'F', 'D', 'L', 'B']
+  for f in range(6):
+    rospy.loginfo("Waiting for face request")
+    while not face_requested and not rospy.is_shutdown():
+      rate.sleep()
+
+    if rospy.is_shutdown():
+      return
+    rospy.loginfo("Face requested")
+
+    success = False
+    while not success:
+
+      success, bgr_frame = cap.read()
+
+      if success:
+        rospy.loginfo("Face captured")
         # Gamma correction
-          lookUpTable = np.empty((1,256), np.uint8)
-          for i in range(256):
-            lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
-          bgr_frame = cv2.LUT(bgr_frame, lookUpTable)
+        bgr_frame = cv2.LUT(bgr_frame, lookUpTable)
+        # Capture facelets
+        for i in range(9):
+          #frame, center_coords, radius, color, thickness
+          dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
+          hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
+          px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
+          # rospy.loginfo("\t" +str(px_hsv[0]) + "\t" + str(px_hsv[1]) + "\t" + str(px_hsv[2]))
 
-        #frame, center_coords, radius, color, thickness
-          for i in range(9):
-            dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
-            hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
-            px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
-            rospy.loginfo("\t" +str(px_hsv[0]) + "\t" + str(px_hsv[1]) + "\t" + str(px_hsv[2]))
+          interpreter_in = np.array([px_hsv], dtype='float32')
+          interpreter.set_tensor(interpreter_in_idx, interpreter_in)
+          interpreter.invoke()
+          interpreter_out = interpreter.get_tensor(interpreter_out_idx)
+          color = np.argmax(interpreter_out)
+          colors[f][i] = color +1
 
-          
+          if i == 4:
+            color_to_pos[color] = pos[f]
 
-        cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
         face_requested = False
-    rate.sleep()
+
+      else:
+        rospy.loginfo("retrying face capture")
+
+    rospy.loginfo(colors[f])
+    pub.publish("1")
+
+    # Save the image file
+    # cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
+
+  kociemba_input = ""
+  for f in range(6):
+    for i in range(8, -1, -1):
+      kociemba_input += color_to_pos[colors[f][i]-1]
+
+  kociemba_output =  kociemba.solve(kociemba_input)
+  kociemba_output = kociemba_output.split(" ")
+
+  instructions = ""
+  for ins in kociemba_output:
+    if ins == 'R2':
+      instructions += "RR"
+    elif ins == 'L2':
+      instructions += "LL"
+    elif ins == 'F2':
+      instructions += "FF"
+    elif ins == 'B2':
+      instructions += "BB"
+    elif ins == 'U2':
+      instructions += "UU"
+    elif ins == 'D2':
+      instructions += "DD"
+    elif ins == "L'":
+      instructions += "l"
+    elif ins == "R'":
+      instructions += "r"
+    elif ins == "F'":
+      instructions += "f"
+    elif ins == "B'":
+      instructions += "b"
+    elif ins == "U'":
+      instructions += "u"
+    elif ins == "D'":
+      instructions += "d"
+    else:
+      instructions += ins
+
+  instructions.append("P")
+  pub.publish(instructions)
 
 if __name__ == '__main__':
   try:

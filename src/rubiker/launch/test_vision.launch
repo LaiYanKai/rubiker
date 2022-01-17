@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+    <node pkg="rubiker" type="test_vision.py" name="vision" output="screen" args="$(env Vision)"/>
+</launch>

@@ -18,6 +18,7 @@ float speed = 0;
 float max_speed = 100;
 char state = 'o';
 char next_end = 'c';
+bool changed_deg = true;
 
 // other global inits
 int ACCEPTABLE_ERROR = 0;
@@ -34,6 +35,7 @@ void handler_y(void)
   } else {
     deg--;
   }
+  changed_deg = true;
 }
 void handler_b(void)
 {
@@ -42,6 +44,7 @@ void handler_b(void)
   } else {
     deg++;
   }
+  changed_deg = true;
 }
 float sign(float x)
 {
@@ -52,7 +55,7 @@ float sign(float x)
   else
     return 0;
 }
-void cbCmd(const rubiker::MotorAck::ConstPtr& msg) {
+void cbCmd(const rubiker::MotorCmd::ConstPtr& msg) {
   seq = msg->seq;
   changed_cmd = true;
   state = msg->type;
@@ -63,7 +66,6 @@ void cbCmd(const rubiker::MotorAck::ConstPtr& msg) {
     duration = msg->duration;
     next_end = msg->end;
   } else if (state == 'p') { // position
-    target += msg->target;
     max_speed = msg->speed; // max speed
     if (max_speed > 100)
       max_speed = 100;
@@ -71,7 +73,7 @@ void cbCmd(const rubiker::MotorAck::ConstPtr& msg) {
       max_speed = -100;
     relative = msg->relative;
     if (relative)
-      target += msg->target;
+      target = deg + msg->target;
     else
       target = msg->target;
     next_end = msg->end;
@@ -80,7 +82,8 @@ void cbCmd(const rubiker::MotorAck::ConstPtr& msg) {
   } else if (state == 'f') { // off
     next_end = msg->end;
   } else if (state == 'r') { // reset degrees
-    // does nothing
+    target = msg->target;
+    next_end = msg->end;
   }
 }
 int main (int argc, char **argv)
@@ -128,7 +131,7 @@ int main (int argc, char **argv)
   auto ack = [&]() { 
     msg_ack.seq = seq; 
     msg_ack.deg = deg;
-    pub_ack(msg_ack); 
+    pub_ack.publish(msg_ack); 
   }; // acknowledge
   auto pwm = [&]() { // pwm
     if (speed >= 0) {
@@ -154,9 +157,9 @@ int main (int argc, char **argv)
   };
   auto pid_reset = [&]() { // reset pid
     accum = 0;
-    prev_error = deg;
+//    prev_error = deg;
   };
-  auto verbose_deg[&]() { // feedback degrees
+  auto verbose_deg = [&]() { // feedback degrees
     if (verbose && changed_deg) {
       ROS_INFO_STREAM("deg" << MTR << ": " << deg);
       changed_deg = false;
@@ -206,23 +209,23 @@ int main (int argc, char **argv)
       pwm();
       ack();
       if (verbose) { ROS_INFO_STREAM(MTR << ": On at " << target << "\%") }; // note speed will be limited max_speed after pwm
-      while (ros::ok() && run && !changed_cmd) { 
+      while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
-        rate.sleep(); 
-        ros::spinOnce(); 
+        rate.sleep();
+        ros::spinOnce();
       }
       target = deg; // for holding at end or next loop pid
       pid_reset(); // for holding at end or next loop pid
-    } else if (state == 'f') { 
+    } else if (state == 'f') {
       ack();
       if (verbose) { ROS_INFO_STREAM(MTR << ": Off") };
-    } else if (state == 'r')
+    } else if (state == 'r') {
       deg = target;
       ack();
     } else {
       ROS_WARN_STREAM("Invalid state " << state << " received");
     }
-    
+
     if (changed_cmd) { continue; }
 
     // handle end action
@@ -232,26 +235,26 @@ int main (int argc, char **argv)
         verbose_deg();
         pid();
         pwm();
-        rate.sleep(); 
+        rate.sleep();
         ros::spinOnce();
       }
     } else if (end == 'c') {
       if (verbose) { ROS_INFO_STREAM(MTR << ": Coasting") };
       softPwmWrite(PIN_K, 0);
       softPwmWrite(PIN_W, 0);
-      while (ros::ok() && run && !changed_cmd) { 
+      while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
-        rate.sleep(); 
-        ros::spinOnce(); 
+        rate.sleep();
+        ros::spinOnce();
       }
     } else {
       if (verbose) { ROS_INFO_STREAM(MTR << ": Braking") };
       softPwmWrite(PIN_K, 100);
       softPwmWrite(PIN_W, 100);
-      while (ros::ok() && run && !changed_cmd) { 
+      while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
-        rate.sleep(); 
-        ros::spinOnce(); 
+        rate.sleep();
+        ros::spinOnce();
       }
     }
   }
