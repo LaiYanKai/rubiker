@@ -5,182 +5,260 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "std_msgs/Empty.h"
-#include "std_msgs/Int32.h"
-#include "std_msgs/Bool.h"
+#include "rubiker/MotorCmd.h"
+#include "rubiker/MotorAck.h"
 
-#define MAX_RESULT 100
+unsigned int seq = -1;
+bool changed_cmd = true;
+bool relative = false;
+bool run = true;
+int target = 0;
+float duration = 0.0;
+float speed = 0;
+float max_speed = 100;
+char state = 'o';
+char next_end = 'c';
 
-int ACCEPTABLE_ERROR = 5;
+// other global inits
+int ACCEPTABLE_ERROR = 0;
+int LOOP_RATE = 0;
 int PIN_Y = 0;
 int PIN_B = 0;
 int deg = 0;
-int target = 0;
-
-bool state_a = false;
-bool state_b = false;
-bool changed_deg = true;
-bool changed_target = false;
-bool stop = false;
 bool verbose = false;
-bool timeout_received = false;
 
-void tacho(bool tac)
+void handler_y(void)
 {
-   // bool dir = state_a == ((!state_b && tac) || (state_b && !tac));
-    bool dir = state_a == (state_b != tac);
-   // TO DO
-    if(dir){
-	deg++;
-    }else{
-	deg--;
-    }
-    changed_deg = true;
-}
-void handler_a(void)
-{
-    tacho(1);
-    state_a = digitalRead(PIN_Y);
-//    ROS_INFO_STREAM("a called to: " << state_a);
+  if (digitalRead(PIN_B)) {
+    deg++;
+  } else {
+    deg--;
+  }
 }
 void handler_b(void)
 {
-    tacho(0);
-    state_b = digitalRead(PIN_B);
-//    ROS_INFO_STREAM("b called to: " << state_b);
+  if (digitalRead(PIN_Y)) {
+    deg--;
+  } else {
+    deg++;
+  }
 }
-
 float sign(float x)
 {
-    if (x > 0)
-        return 1;
-    else if (x < 0)
-        return -1;
+  if (x > 0)
+    return 1;
+  else if (x < 0)
+    return -1;
+  else
+    return 0;
+}
+void cbCmd(const rubiker::MotorAck::ConstPtr& msg) {
+  seq = msg->seq;
+  changed_cmd = true;
+  state = msg->type;
+  if (state == 's') { // stop
+    run = false;
+  } else if (state == 't') { // timed
+    speed = msg->speed;
+    duration = msg->duration;
+    next_end = msg->end;
+  } else if (state == 'p') { // position
+    target += msg->target;
+    max_speed = msg->speed; // max speed
+    if (max_speed > 100)
+      max_speed = 100;
+    else if (max_speed < -100)
+      max_speed = -100;
+    relative = msg->relative;
+    if (relative)
+      target += msg->target;
     else
-        return 0;
-}
-void cbTarget(const std_msgs::Int32::ConstPtr& msg)
-{
-    target = msg->data;
-    changed_target = true;
-}
-void cbStop(const std_msgs::Bool::ConstPtr& msg)
-{
-    stop = msg->data;
-}
-void cbTimeout(const std_msgs::Empty::ConstPtr& msg)
-{
-    timeout_received = true;
+      target = msg->target;
+    next_end = msg->end;
+  } else if (state == 'o') { // on at speed
+    speed = msg->speed;
+  } else if (state == 'f') { // off
+    next_end = msg->end;
+  } else if (state == 'r') { // reset degrees
+    // does nothing
+  }
 }
 int main (int argc, char **argv)
 {
-    ros::init(argc, argv, "motor");
-    ros::NodeHandle nh;
+  ros::init(argc, argv, "motor");
+  ros::NodeHandle nh;
 
-    // Parse arguments
-    std::string MTR(argv[1]);
-    std::string TOPIC_TARGET = "target" + MTR;
-    std::string TOPIC_TIMEOUT = "timeout" + MTR;
-    std::string TOPIC_COMP = "comp" + MTR;
-    int PIN_K = strtol(argv[2], nullptr, 0);
-    int PIN_W = strtol(argv[3], nullptr, 0);
-    PIN_Y = strtol(argv[4], nullptr, 0);
-    PIN_B = strtol(argv[5], nullptr, 0);
-    float KP = strtof(argv[6], nullptr);
-    float KI = strtof(argv[7], nullptr);
-    float KD = strtof(argv[8], nullptr);
-    ACCEPTABLE_ERROR = strtol(argv[9], nullptr, 0);
-    verbose = strtol(argv[10], nullptr, 0);
-    ROS_INFO("%2s --> K:%02d  W:%02d  Y:%02d  B:%02d  KP:%9.5f  KI:%9.5f  KD:%9.5f  Verbose:%d", MTR.c_str(), PIN_K, PIN_W, PIN_Y, PIN_B, KP, KI, KD, verbose);
+  // Parse arguments
+  std::string MTR(argv[1]);
+  int PIN_K = strtol(argv[2], nullptr, 0);
+  int PIN_W = strtol(argv[3], nullptr, 0);
+  PIN_Y = strtol(argv[4], nullptr, 0);
+  PIN_B = strtol(argv[5], nullptr, 0);
+  float KP = strtof(argv[6], nullptr);
+  float KI = strtof(argv[7], nullptr);
+  float KD = strtof(argv[8], nullptr);
+  ACCEPTABLE_ERROR = strtol(argv[9], nullptr, 0);
+  LOOP_RATE = strtof(argv[11], nullptr);
+  verbose = strtol(argv[12], nullptr, 0);
+  ROS_INFO("%2s --> K:%02d  W:%02d  Y:%02d  B:%02d  KP:%9.5f  KI:%9.5f  KD:%9.5f  AE:%d  LRATE:%f  Verbose:%d",
+    MTR.c_str(), PIN_K, PIN_W, PIN_Y, PIN_B, KP, KI, KD, ACCEPTABLE_ERROR, LOOP_RATE, verbose);
 
-    // Prepare pins with WiringPi
-    if (wiringPiSetupGpio() >  0) { return 1; }
-    pinMode(PIN_Y, INPUT);
-    pinMode(PIN_B, INPUT);
-    state_a = digitalRead(PIN_Y);
-    state_b = digitalRead(PIN_B);
-    if (wiringPiISR(PIN_Y, INT_EDGE_BOTH, &handler_a)  < 0) { ROS_INFO("loser1"); return 1; }
-    if (wiringPiISR(PIN_B, INT_EDGE_BOTH, &handler_b)  < 0) { ROS_INFO("loser1"); return 1; }
-    softPwmCreate(PIN_K, 0, 100);
-    softPwmCreate(PIN_W, 0, 100);
+  // Prepare pins with WiringPi
+  if (wiringPiSetupGpio() >  0) { return 1; }
+  pinMode(PIN_Y, INPUT);
+  pinMode(PIN_B, INPUT);
+  if (wiringPiISR(PIN_Y, INT_EDGE_FALLING, &handler_y)  < 0) { ROS_INFO("Pin Y ISR Error"); return 1; }
+  if (wiringPiISR(PIN_B, INT_EDGE_FALLING, &handler_b)  < 0) { ROS_INFO("Pin B ISR Error"); return 1; }
+  softPwmCreate(PIN_K, 0, 100);
+  softPwmCreate(PIN_W, 0, 100);
 
-    // subscribers
-    ros::Subscriber sub_target = nh.subscribe(TOPIC_TARGET, 1, cbTarget);
-    ros::Subscriber sub_stop = nh.subscribe("stop", 1, cbStop);
-    ros::Subscriber sub_timeout = nh.subscribe(TOPIC_TIMEOUT, 1, cbTimeout);
-    ros::Publisher pub_comp = nh.advertise<std_msgs::Empty>(TOPIC_COMP, 1, true);
-    std_msgs::Empty msg_comp;
+  // subscribers and publishers
+  ros::Subscriber sub_cmd = nh.subscribe("cmd" + MTR, 1, cbCmd);
+  ros::Publisher pub_ack = nh.advertise<rubiker::MotorAck>("ack" + MTR, 1, true);
+  rubiker::MotorAck msg_ack;
 
-    // Prepare PID variables
-    float accum = 0;
-    float prev_error = 0;
-    float error,  prop, integ, deriv, result;
-    int result_int;
-    ros::Rate looper(40);
-    int prev_exec_counter = -1;
+  // Prepare PID variables
+  float accum = 0;
+  float prev_error = 0;
+  float error,  prop, integ, deriv;
+  char end;
+  ros::Rate rate(LOOP_RATE);
 
-    pub_comp.publish(msg_comp);
-    // Main Loop
-    while (ros::ok() && !stop)
-    {
-        // verbose for testing
-        if (verbose && changed_deg) {
-            ROS_INFO_STREAM("deg" << MTR << ": " << deg);
-            changed_deg = false;
-        }
-
-        // Error
-        error = target - deg;
-
-        if (timeout_received)
-        {
-            timeout_received = false;
-            target = deg;
-            error = 0;
-            ROS_INFO("%2s: Timeout Received", MTR.c_str());
-        }
-
-        if (changed_target && abs(error) < ACCEPTABLE_ERROR)
-        {
-            pub_comp.publish(msg_comp);
-            changed_target = false;
-        }
-
-
-        // PID
-        prop = KP * error;
-        accum += error;
-        integ = KI * accum;
-        deriv = KD * (error - prev_error);
-        prev_error = error;
-        result = prop + integ + deriv;
-        result_int = (int) result;
-
-        if (sign(error) != sign(prev_error))
-            accum = 0;
-
-        if (result >= 0)
-        {
-            if (result_int > MAX_RESULT)
-                result_int = MAX_RESULT;
-            softPwmWrite(PIN_K, 0);
-            softPwmWrite(PIN_W, result_int);
-        }
-        else
-        {
-            if (result_int < -MAX_RESULT)
-                result_int = -MAX_RESULT;
-            softPwmWrite(PIN_K, -result_int);
-            softPwmWrite(PIN_W, 0);
-        }
-
-
-        ros::spinOnce();
-	looper.sleep();
+  // lambdas
+  auto ack = [&]() { 
+    msg_ack.seq = seq; 
+    msg_ack.deg = deg;
+    pub_ack(msg_ack); 
+  }; // acknowledge
+  auto pwm = [&]() { // pwm
+    if (speed >= 0) {
+      if (speed > max_speed) {speed = max_speed;}
+      softPwmWrite(PIN_K, 0);
+      softPwmWrite(PIN_W, speed);
+    } else {
+      if (speed < -max_speed) {speed = -max_speed;}
+      softPwmWrite(PIN_K, -speed);
+      softPwmWrite(PIN_W, 0);
     }
+  };
+  auto pid = [&]() { // one pid iteration
+    error = target - deg;
+    prop = KP * error;
+    accum += error;
+    integ = KI * accum;
+    deriv = KD * (error - prev_error);
+    prev_error = error;
+    speed = prop + integ + deriv;
+    if (sign(error) != sign(prev_error))
+      accum = 0;
+  };
+  auto pid_reset = [&]() { // reset pid
+    accum = 0;
+    prev_error = deg;
+  };
+  auto verbose_deg[&]() { // feedback degrees
+    if (verbose && changed_deg) {
+      ROS_INFO_STREAM("deg" << MTR << ": " << deg);
+      changed_deg = false;
+    }
+  };
 
-    softPwmWrite(PIN_K, 0);
-    softPwmWrite(PIN_W, 0);
-    return 0;
+  // Acknowledge
+  ack();
+
+  // Main Loop
+  while (ros::ok() && run) {
+    // write end
+    end = next_end;
+    changed_cmd = false;
+
+    // handle states
+    if (state == 'w') { // timeout (watchdog)
+      ROS_INFO_STREAM(MTR << ": Timeout Received");
+      target = deg; // for holding at end or next loop pid
+      pid_reset(); // for holding at end or next loop pid
+      ack();
+    } else if (state == 't') { // timed
+      max_speed = 100;
+      pwm();
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Timed " << speed << "\% for " << duration << "s") }; // note speed will be limited max_speed after pwms
+      ros::Duration{duration}.sleep();
+      verbose_deg();
+      target = deg; // for holding at end or next loop pid
+      pid_reset(); // for holding at end or next loop pid
+      ack();
+    } else if (state == 'p') { // position
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Target " << target << " at max " << max_speed << "\%") };
+      pid_reset();
+      while (ros::ok() && run && !changed_cmd) {
+        verbose_deg();
+        pid();
+        pwm();
+        if (abs(error) <= ACCEPTABLE_ERROR) {
+          ack();
+          break;
+        }
+        rate.sleep();
+        ros::spinOnce();
+      }
+    } else if (state == 'o') { // on at speed
+      max_speed = 100;
+      pwm();
+      ack();
+      if (verbose) { ROS_INFO_STREAM(MTR << ": On at " << target << "\%") }; // note speed will be limited max_speed after pwm
+      while (ros::ok() && run && !changed_cmd) { 
+        verbose_deg();
+        rate.sleep(); 
+        ros::spinOnce(); 
+      }
+      target = deg; // for holding at end or next loop pid
+      pid_reset(); // for holding at end or next loop pid
+    } else if (state == 'f') { 
+      ack();
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Off") };
+    } else if (state == 'r')
+      deg = target;
+      ack();
+    } else {
+      ROS_WARN_STREAM("Invalid state " << state << " received");
+    }
+    
+    if (changed_cmd) { continue; }
+
+    // handle end action
+    if (end == 'h') {
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Holding") };
+      while (ros::ok() && run && !changed_cmd) {
+        verbose_deg();
+        pid();
+        pwm();
+        rate.sleep(); 
+        ros::spinOnce();
+      }
+    } else if (end == 'c') {
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Coasting") };
+      softPwmWrite(PIN_K, 0);
+      softPwmWrite(PIN_W, 0);
+      while (ros::ok() && run && !changed_cmd) { 
+        verbose_deg();
+        rate.sleep(); 
+        ros::spinOnce(); 
+      }
+    } else {
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Braking") };
+      softPwmWrite(PIN_K, 100);
+      softPwmWrite(PIN_W, 100);
+      while (ros::ok() && run && !changed_cmd) { 
+        verbose_deg();
+        rate.sleep(); 
+        ros::spinOnce(); 
+      }
+    }
+  }
+
+  softPwmWrite(PIN_K, 0);
+  softPwmWrite(PIN_W, 0);
+  ROS_INFO_STREAM("Stopped " << MTR);
+  return 0;
 }
 

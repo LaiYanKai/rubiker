@@ -1,0 +1,206 @@
+#include "rubiker/MotorCmd.h"
+#include "rubiker/MotorAck.h"
+
+bool ackLW = false;
+bool ackRH = false;
+bool ackLH = false;
+bool ackRW = false;
+bool ackFW = false;
+bool ackBH = false;
+bool ackFH = false;
+bool ackBW = false;
+bool ackPP = false;
+
+void cbAckPP(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackPP = true;
+}
+
+void cbAckLW(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackLW = true;
+}
+void cbAckRH(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackRH = true;
+}
+void cbAckLH(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackLH = true;
+}
+void cbAckRW(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackRW = true;
+}
+void cbAckFW(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackFW = true;
+}
+void cbAckBH(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackBH = true;
+}
+void cbAckFH(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackFH = true;
+}
+void cbAckBW(const rubiker::MotorAck::ConstPtr& msg)
+{
+   ackBW = true;
+}
+
+
+    ros::Subscriber sub_ackLW = nm.subscribe("ackLW", 1, cbAckLW);
+    ros::Subscriber sub_ackRH = nm.subscribe("ackRH", 1, cbAckRH);
+    ros::Subscriber sub_ackLH = nm.subscribe("ackLH", 1, cbAckLH);
+    ros::Subscriber sub_ackRW = nm.subscribe("ackRW", 1, cbAckRW);
+    ros::Subscriber sub_ackFW = nm.subscribe("ackFW", 1, cbAckFW);
+    ros::Subscriber sub_ackBH = nm.subscribe("ackBH", 1, cbAckBH);
+    ros::Subscriber sub_ackFH = nm.subscribe("ackFH", 1, cbAckFH);
+    ros::Subscriber sub_ackBW = nm.subscribe("ackBW", 1, cbAckBW);
+    ros::Subscriber sub_ackPP = nm.subscribe("ackPP", 1, cbAckPP);
+
+    // wait for motors
+    while (ros::ok() && !ackLW) {ros::spinOnce();}; ackLW = false; ROS_INFO("LW acknowledged");
+    while (ros::ok() && !ackRH) {ros::spinOnce();}; ackRH = false; ROS_INFO("RH acknowledged");
+    while (ros::ok() && !ackLH) {ros::spinOnce();}; ackLH = false; ROS_INFO("LH acknowledged");
+    while (ros::ok() && !ackRW) {ros::spinOnce();}; ackRW = false; ROS_INFO("RW acknowledged");
+    while (ros::ok() && !ackFW) {ros::spinOnce();}; ackFW = false; ROS_INFO("FW acknowledged");
+    while (ros::ok() && !ackBH) {ros::spinOnce();}; ackBH = false; ROS_INFO("BH acknowledged");
+    while (ros::ok() && !ackFH) {ros::spinOnce();}; ackFH = false; ROS_INFO("FH acknowledged");
+    while (ros::ok() && !ackBW) {ros::spinOnce();}; ackBW = false; ROS_INFO("BW acknowledged");
+    while (ros::ok() && !ackPP) {ros::spinOnce();}; ackPP = false; ROS_INFO("PP acknowledged");
+
+
+    ros::Publisher pub_cmdLW = nm.advertise<std_msgs::Int32>("cmdLW", 1, true);
+    ros::Publisher pub_cmdRH = nm.advertise<std_msgs::Int32>("cmdRH", 1, true);
+    ros::Publisher pub_cmdLH = nm.advertise<std_msgs::Int32>("cmdLH", 1, true);
+    ros::Publisher pub_cmdRW = nm.advertise<std_msgs::Int32>("cmdRW", 1, true);
+    ros::Publisher pub_cmdFW = nm.advertise<std_msgs::Int32>("cmdFW", 1, true);
+    ros::Publisher pub_cmdBH = nm.advertise<std_msgs::Int32>("cmdBH", 1, true);
+    ros::Publisher pub_cmdFH = nm.advertise<std_msgs::Int32>("cmdFH", 1, true);
+    ros::Publisher pub_cmdBW = nm.advertise<std_msgs::Int32>("cmdBW", 1, true);
+    ros::Publisher pub_cmdPP = nm.advertise<std_msgs::Int32>("cmdPP", 1, true);
+
+    ros::Rate looper(50);
+    rubiker::MotorCmd msg_cmd;
+    
+    auto cmd_timeout [&](ros::Publisher & pub_cmd, char end) {
+      msg_cmd.seq++;
+      msg_cmd.type = 'w';
+      msg_cmd.end = end;
+      msg_cmd.target = 0;
+      msg_cmd.speed = 0;
+      msg_cmd.duration = 0;
+      msg_cmd.relative = false;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_stop [&](ros::Publisher & pub_cmd) {
+      msg_cmd.seq++;
+      msg_cmd.type = 's';
+      msg_cmd.end = 'c';
+      msg_cmd.target = 0;
+      msg_cmd.speed = 0;
+      msg_cmd.duration = 0;
+      msg_cmd.relative = false;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_pos [&](ros::Publisher & pub_cmd, int target, float max_speed, bool relative, char end) {
+      msg_cmd.seq++;
+      msg_cmd.type = 'p';
+      msg_cmd.end = end;
+      msg_cmd.target = target;
+      msg_cmd.speed = max_speed;
+      msg_cmd.relative = relative;
+      msg_cmd.duration = 0;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_time [&](ros::Publisher & pub_cmd, float duration, float speed, char end) {
+      msg_cmd.seq++;
+      msg_cmd.type = 't';
+      msg_cmd.end = end;
+      msg_cmd.target = 0;
+      msg_cmd.speed = max_speed;
+      msg_cmd.relative = false;
+      msg_cmd.duration = duration;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_on [&](ros::Publisher & pub_cmd, float speed) {
+      msg_cmd.seq++;
+      msg_cmd.type = 'o';
+      msg_cmd.end = 'c';
+      msg_cmd.target = 0;
+      msg_cmd.speed = speed;
+      msg_cmd.relative = false;
+      msg_cmd.duration = 0;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_off [&] (ros::Publisher & pub_cmd, char end) {
+      msg_cmd.seq++;
+      msg_cmd.type = 'f';
+      msg_cmd.end = end;
+      msg_cmd.target = 0;
+      msg_cmd.speed = 0;
+      msg_cmd.relative = false;
+      msg_cmd.duration = 0;
+      pub_cmd(msg_cmd);
+    };
+    auto cmd_reset [&] (ros::Publisher & pub_cmd, int target) {
+      msg_cmd.seq++;
+      msg_cmd.type = 'r';
+      msg_cmd.end = 'c';
+      msg_cmd.target = target;
+      msg_cmd.speed = 0;
+      msg_cmd.relative = false;
+      msg_cmd.duration = 0;
+      pub_cmd(msg_cmd);
+    };
+    
+    auto wait_ack [&](bool & ack) {
+      while (!ack && ros::ok()) { 
+        ros::spinOnce(); 
+        looper.sleep(); 
+      }; 
+      ack = false;
+    };
+    auto wait_ack_timeout [&](ros::Publisher & pub_cmd, bool & ack, float timeout_duration, char end) {
+      ros::Time timeout = ros::Time::now() + ros::Duration(timeout_duration);
+      bool has_timedout = false;
+      while(!ack && ros::ok()) {
+        ros::spinOnce();
+        looper.sleep();
+        if (ros::Time::now() >= timeout) {
+          has_timedout = true;
+          break;
+        }
+      }
+      ack = false;
+      if (has_timedout)
+        cmd_timeout(pub_cmd, end);
+    };
+
+// targets all relative now, managed in motor.cpp
+
+
+auto exec_wrist [&](ros::Publisher & pub_cmd, std::string verbose, int & target, int WRIST, int OFFSET, bool & ack) {
+  ROS_INFO_STREAM(verbose);
+  target += WRIST;
+  cmd_pos(pub_cmd, target + OFFSET, 100, false, 'h');
+  wait_ack(ack);
+
+  cmd_pos(pub_cmd, target, 100, false, 'h');
+  wait_ack(ack);
+};
+auto exec_wrist_reset [&] (ros::Publisher & pub_cmd, std::string verbose, int & target, bool & ack) {
+  ROS_INFO_STREAM(verbose);
+  cmd_time(pub_cmd, 0.3, 50, 'h');
+  wait_ack(ack);
+
+  cmd_reset(pub_cmd, target);
+  wait_ack(ack);
+};
+auto exec_hand [&](ros::Publisher & pub_cmd, std::string verbose, int HAND, int TIMEOUT, bool & ack) {
+  ROS_INFO_STREAM(verbose);
+  cmd_pos(pub_cmd, HAND, 100, false, 'h');
+  wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'h');
+};
