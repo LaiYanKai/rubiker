@@ -3,16 +3,19 @@
 source devel/setup.bash
 echo "BASH SOURCED"
 
-#sudo ip ad add 10.0.0.1/24 dev eth0
-export ROS_HOSTNAME=192.168.105.117
-export ROS_MASTER_URI=http://192.168.105.117:11311
+sudo ip ad add 10.0.0.1/24 dev eth0
+sudo ip link set dev eth0 up
+export ROS_HOSTNAME=10.0.0.1
+export ROS_MASTER_URI=http://10.0.0.1:11311
 
-# MTR PIN_K(BCM) PIN_W(BCM) PIN_Y(WPI/Name) PIN_B(WPI/Name) KP KI KD
-export MotorLW="LW 15 14 4 1 2.2 0.1 0.8"
-export MotorRH="RH 25 24 27 26 1.0 0.1 0.8"
-export MotorLH="LH 7 8 29 28 1.0 0.1 0.8"
-export MotorRW="RW 6 5 25 24 2.0 0.01 1.0"
-export instructions="L"
+# 		MTR 	K(BCM)	W(BCM)	Y(BCM) B(BCM) 	KP 	KI 	KD 	ErrThrs	Verbose
+export MotorLW="LW	15	14	18	23	2.0	0.001	3	5	0"
+export MotorRH="RH	25	24	12	16	2.0	0.001	2	5	0"
+export MotorLH="LH	17	27	20	21	2.5	0.005	3	5	0"
+export MotorRW="RW	6	5	19	26	2.0	0.001	3	5	0"
+# 		Instructions	WRISTAW H{OC} 	TIMEOUT OFFW{L,R,F,B}	P{U,M,D}
+export master="	pCP		540	0 550	1.00	90 90 90 90	0 -100 -480"
+#bdLFt
 #BfTlRF -- 13 sec
 #tBDflRbrd -- 30 sec
 #lRTbdLFL -- 30 sec

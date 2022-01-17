@@ -2,86 +2,165 @@
 #include <stdlib.h>
 #include "std_msgs/Int32.h"
 #include "std_msgs/Bool.h"
+#include "std_msgs/Empty.h"
 #include <wiringPi.h>
 #include <softPwm.h>
 
-#define THRESH 15
-#define WRISTCW -540
-#define WRISTACW 540
-#define HANDOPEN -450
-#define HANDCLOSE 0
-#define L_CW 1
-#define L_ACW 2
-#define L_CLOSE 3
-#define L_OPEN 4
-#define R_CW 5
-#define R_ACW 6
-#define R_CLOSE 7
-#define R_OPEN 8
-#define F_CW 9
-#define F_ACW 10
-#define F_CLOSE 11
-#define F_OPEN 12
-#define B_CW 13
-#define B_ACW 14
-#define B_CLOSE 15
-#define B_OPEN 16
-#define L_TURNOPEN 17
-#define R_TURNOPEN 18
-#define F_TURNOPEN 19
-#define B_TURNOPEN 20
-#define L_CW_R_ACW 21
-#define L_ACW_R_CW 22
-#define TIMEOUT 0.75
+enum State {
+    L_CW, L_ACW, L_CLOSE, L_OPEN,
+    R_CW, R_ACW, R_CLOSE, R_OPEN,
+    F_CW, F_ACW, F_CLOSE, F_OPEN,
+    B_CW, B_ACW, B_CLOSE, B_OPEN,
+    L_TURNOPEN, R_TURNOPEN, F_TURNOPEN, B_TURNOPEN,
+    L_CW_R_ACW, L_ACW_R_CW,
+    P_U, P_D, P_M, F_ACW_B_CW
+    };
 
-int degLW = 0;
-int degRH = 0;
-int degLH = 0;
-int degRW = 0;
-int degFW = 0;
-int degBH = 0;
-int degFH = 0;
-int degBW = 0;
+// These will be overwritten by arguments to main
+int WRIST = 540;
+int HANDOPEN = 50;
+int HANDCLOSE = 500;
+float TIMEOUT = 0.75;
+int OFFLW = 40;
+int OFFRW = 20;
+int OFFFW = 20;
+int OFFBW = 40;
+int PUP = 0;
+int PMID = 0;
+int PDOWN = -500;
 
-void cbDegLW(const std_msgs::Int32::ConstPtr& msg)
+bool compLW = false;
+bool compRH = false;
+bool compLH = false;
+bool compRW = false;
+bool compFW = false;
+bool compBH = false;
+bool compFH = false;
+bool compBW = false;
+bool compPP = false;
+
+void cbCompPP(const std_msgs::Empty::ConstPtr& msg)
 {
-   degLW = msg->data;
-}
-void cbDegRH(const std_msgs::Int32::ConstPtr& msg)
-{
-   degRH = msg->data;
-}
-void cbDegLH(const std_msgs::Int32::ConstPtr& msg)
-{
-   degLH = msg->data;
-}
-void cbDegRW(const std_msgs::Int32::ConstPtr& msg)
-{
-   degRW = msg->data;
-}
-void cbDegFW(const std_msgs::Int32::ConstPtr& msg)
-{
-   degFW = msg->data;
-}
-void cbDegBH(const std_msgs::Int32::ConstPtr& msg)
-{
-   degBH = msg->data;
-}
-void cbDegFH(const std_msgs::Int32::ConstPtr& msg)
-{
-   degFH = msg->data;
-}
-void cbDegBW(const std_msgs::Int32::ConstPtr& msg)
-{
-   degBW = msg->data;
+   compPP = true;
 }
 
-// W1C3
-// W4C2
+void cbCompLW(const std_msgs::Empty::ConstPtr& msg)
+{
+   compLW = true;
+}
+void cbCompRH(const std_msgs::Empty::ConstPtr& msg)
+{
+   compRH = true;
+}
+void cbCompLH(const std_msgs::Empty::ConstPtr& msg)
+{
+   compLH = true;
+}
+void cbCompRW(const std_msgs::Empty::ConstPtr& msg)
+{
+   compRW = true;
+}
+void cbCompFW(const std_msgs::Empty::ConstPtr& msg)
+{
+   compFW = true;
+}
+void cbCompBH(const std_msgs::Empty::ConstPtr& msg)
+{
+   compBH = true;
+}
+void cbCompFH(const std_msgs::Empty::ConstPtr& msg)
+{
+   compFH = true;
+}
+void cbCompBW(const std_msgs::Empty::ConstPtr& msg)
+{
+   compBW = true;
+}
+
+void exec_wrist(std::string verbose, int & target, bool & comp, int WRIST, int OFFSET,
+    ros::Publisher & pub_target, std_msgs::Int32 & msg_target, ros::Rate & looper)
+{
+    ROS_INFO_STREAM(verbose);
+    target += WRIST;
+    msg_target.data = target + OFFSET;
+    pub_target.publish(msg_target);
+    while (!comp && ros::ok()) { ros::spinOnce(); looper.sleep(); }; comp = false;
+
+    msg_target.data = target;
+    pub_target.publish(msg_target);
+    while (!comp && ros::ok()) { ros::spinOnce(); looper.sleep(); }; comp = false;
+}
+void exec_hand(std::string verbose, int & target, bool & comp, int HAND, float TIMEOUT,
+    ros::Publisher & pub_target, std_msgs::Int32 & msg_target,
+    ros::Publisher & pub_timeout, std_msgs::Empty & msg_timeout, ros::Rate & looper)
+{
+    ROS_INFO_STREAM(verbose);
+    target = HAND;
+    msg_target.data = target;
+    pub_target.publish(msg_target);
+
+    ros::Time timeout = ros::Time::now() + ros::Duration(TIMEOUT);
+    bool has_timedout = false;
+    int i = 0;
+    while(!comp && ros::ok()) {
+        ros::spinOnce();
+        looper.sleep();
+        ROS_INFO_STREAM(comp);
+        if (ros::Time::now() >= timeout) {
+            has_timedout = true;
+            i++;
+            ROS_INFO_STREAM("TIMEOUTED");
+        }
+    }
+    comp = false;
+
+    if (has_timedout)
+        pub_timeout.publish(msg_timeout);
+}
+
 int main(int argc, char **argv) {
     ros::init(argc, argv, "master");
     ros::NodeHandle nm;
+
+    // Parse arguments
+    WRIST = strtol(argv[2], nullptr, 0);
+    HANDOPEN = strtol(argv[3], nullptr, 0);
+    HANDCLOSE = strtol(argv[4], nullptr, 0);
+    TIMEOUT = strtof(argv[5], nullptr);
+    OFFLW = strtol(argv[6], nullptr, 0);
+    OFFRW = strtol(argv[7], nullptr, 0);
+    OFFFW = strtol(argv[8], nullptr, 0);
+    OFFBW = strtol(argv[9], nullptr, 0);
+    PUP = strtol(argv[10], nullptr, 0);
+    PMID = strtol(argv[11], nullptr, 0);
+    PDOWN = strtol(argv[12], nullptr, 0);
+    ROS_INFO("Master --> I:%s  WRIST:%d  HAND{OC}:%d,%d  TO:%f  OFF{LRFB}:%d,%d,%d,%d  P{UMD}:%d,%d,%d", argv[1], WRIST, HANDOPEN, HANDCLOSE, TIMEOUT, OFFLW, OFFRW, OFFFW, OFFBW, PUP, PMID, PDOWN);
+
     wiringPiSetupGpio();
+
+    ros::Subscriber sub_compLW = nm.subscribe("compLW", 1, cbCompLW);
+    ros::Subscriber sub_compRH = nm.subscribe("compRH", 1, cbCompRH);
+    ros::Subscriber sub_compLH = nm.subscribe("compLH", 1, cbCompLH);
+    ros::Subscriber sub_compRW = nm.subscribe("compRW", 1, cbCompRW);
+    ros::Subscriber sub_compFW = nm.subscribe("compFW", 1, cbCompFW);
+    ros::Subscriber sub_compBH = nm.subscribe("compBH", 1, cbCompBH);
+    ros::Subscriber sub_compFH = nm.subscribe("compFH", 1, cbCompFH);
+    ros::Subscriber sub_compBW = nm.subscribe("compBW", 1, cbCompBW);
+    ros::Subscriber sub_compPP = nm.subscribe("compPP", 1, cbCompPP);
+
+    // wait for motors
+    while (ros::ok() && !compLW) {ros::spinOnce();}; compLW = false; ROS_INFO("LW acknowledged");
+    while (ros::ok() && !compRH) {ros::spinOnce();}; compRH = false; ROS_INFO("RH acknowledged");
+    while (ros::ok() && !compLH) {ros::spinOnce();}; compLH = false; ROS_INFO("LH acknowledged");
+    while (ros::ok() && !compRW) {ros::spinOnce();}; compRW = false; ROS_INFO("RW acknowledged");
+    while (ros::ok() && !compFW) {ros::spinOnce();}; compFW = false; ROS_INFO("FW acknowledged");
+    while (ros::ok() && !compBH) {ros::spinOnce();}; compBH = false; ROS_INFO("BH acknowledged");
+    while (ros::ok() && !compFH) {ros::spinOnce();}; compFH = false; ROS_INFO("FH acknowledged");
+    while (ros::ok() && !compBW) {ros::spinOnce();}; compBW = false; ROS_INFO("BW acknowledged");
+    while (ros::ok() && !compPP) {ros::spinOnce();}; compPP = false; ROS_INFO("PP acknowledged");
+
+    if (!ros::ok())
+        return 1;
 
     ros::Publisher pub_targetLW = nm.advertise<std_msgs::Int32>("targetLW", 1, true);
     ros::Publisher pub_targetRH = nm.advertise<std_msgs::Int32>("targetRH", 1, true);
@@ -91,33 +170,174 @@ int main(int argc, char **argv) {
     ros::Publisher pub_targetBH = nm.advertise<std_msgs::Int32>("targetBH", 1, true);
     ros::Publisher pub_targetFH = nm.advertise<std_msgs::Int32>("targetFH", 1, true);
     ros::Publisher pub_targetBW = nm.advertise<std_msgs::Int32>("targetBW", 1, true);
+    ros::Publisher pub_targetPP = nm.advertise<std_msgs::Int32>("targetPP", 1, true);
+
+    ros::Publisher pub_timeoutLW = nm.advertise<std_msgs::Empty>("timeoutLW", 1, true);
+    ros::Publisher pub_timeoutRH = nm.advertise<std_msgs::Empty>("timeoutRH", 1, true);
+    ros::Publisher pub_timeoutLH = nm.advertise<std_msgs::Empty>("timeoutLH", 1, true);
+    ros::Publisher pub_timeoutRW = nm.advertise<std_msgs::Empty>("timeoutRW", 1, true);
+    ros::Publisher pub_timeoutFW = nm.advertise<std_msgs::Empty>("timeoutFW", 1, true);
+    ros::Publisher pub_timeoutBH = nm.advertise<std_msgs::Empty>("timeoutBH", 1, true);
+    ros::Publisher pub_timeoutFH = nm.advertise<std_msgs::Empty>("timeoutFH", 1, true);
+    ros::Publisher pub_timeoutBW = nm.advertise<std_msgs::Empty>("timeoutBW", 1, true);
+    ros::Publisher pub_timeoutPP = nm.advertise<std_msgs::Empty>("timeoutPP", 1, true);
+
     ros::Publisher pub_stop = nm.advertise<std_msgs::Bool>("stop", 1, true);
-    ros::Subscriber sub_degLW = nm.subscribe("degLW", 1, cbDegLW);
-    ros::Subscriber sub_degRH = nm.subscribe("degRH", 1, cbDegRH);
-    ros::Subscriber sub_degLH = nm.subscribe("degLH", 1, cbDegLH);
-    ros::Subscriber sub_degRW = nm.subscribe("degRW", 1, cbDegRW);
-    ros::Subscriber sub_degFW = nm.subscribe("degFW", 1, cbDegFW);
-    ros::Subscriber sub_degBH = nm.subscribe("degBH", 1, cbDegBH);
-    ros::Subscriber sub_degFH = nm.subscribe("degFH", 1, cbDegFH);
-    ros::Subscriber sub_degBW = nm.subscribe("degBW", 1, cbDegBW);
+
     int targetLH = 0, targetLW = 0, targetRH = 0, targetRW = 0,
-        targetBH = 0, targetBW = 0, targetFH = 0, targetFW = 0;
+        targetBH = 0, targetBW = 0, targetFH = 0, targetFW = 0, targetPP = 0;
 
     ros::Rate looper(50);
-
-    std_msgs::Int32 msg;
+    std_msgs::Int32 msg_target;
+    std_msgs::Empty msg_timeout;
     std_msgs::Bool msg_stop;
-    msg_stop.data = false;
-    pub_stop.publish(msg_stop);
 
     bool upL = true, upR = true, upF = true, upB = true,
          cL = true, cR = true, cF = true, cB = true, rotated = false;
+
     std::string instructions(argv[1]); //{'L','l','R','r','F','f','B','b','T','t','D','d'};
-    std::vector<int>states = {};
+    std::vector<State>states = {};
+
     for(auto instruction: instructions)
     {
         ROS_INFO_STREAM("Instruction: " << instruction);
-        if(instruction == 'L'){ 
+	if (instruction == 'P'){
+            if(!rotated){
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+                    states.push_back(F_CLOSE);
+                }
+		if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    states.push_back(B_CLOSE);
+                }
+		if(upL){
+                    states.push_back(L_TURNOPEN);
+                    states.push_back(L_CLOSE);
+                }
+		if(upR){
+                    states.push_back(R_TURNOPEN);
+                    states.push_back(R_CLOSE);
+		}
+		    states.push_back(F_OPEN);
+                    states.push_back(B_OPEN);
+                    states.push_back(P_M);
+                    states.push_back(L_TURNOPEN);
+                    states.push_back(R_TURNOPEN);
+                    states.push_back(P_U);
+            }else{
+               if(!upF){
+                   states.push_back(F_TURNOPEN);
+                    upF = !upF;
+                    ROS_INFO_STREAM("F_TURNOPEN");
+                }
+                if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    upB = !upB;
+                    ROS_INFO_STREAM("B_TURNOPEN");
+                }
+                if(upB){
+                    states.push_back(B_OPEN);
+                }
+                if(upF){
+                    states.push_back(F_OPEN);
+                }
+                states.push_back(L_ACW_R_CW);
+                upL = !upL;
+                upR = !upR;
+                states.push_back(F_CLOSE);
+                states.push_back(B_CLOSE);
+                rotated = !rotated;
+                if(!upF){
+                    states.push_back(F_TURNOPEN);
+		    states.push_back(F_CLOSE);
+                }
+		if(!upB){
+                    states.push_back(B_TURNOPEN);
+                    states.push_back(B_CLOSE);
+                }
+		if(upL){
+                    states.push_back(L_TURNOPEN);
+                    states.push_back(L_CLOSE);
+                }
+		if(upR){
+                    states.push_back(R_TURNOPEN);
+                    states.push_back(R_CLOSE);
+		}
+	        states.push_back(F_OPEN);
+                states.push_back(B_OPEN);
+                states.push_back(P_M);
+                states.push_back(L_TURNOPEN);
+                states.push_back(R_TURNOPEN);
+                states.push_back(P_U);
+            }
+	}
+        else if(instruction == 'p'){
+            states.push_back(L_ACW_R_CW);
+            states.push_back(L_CLOSE);
+            states.push_back(R_CLOSE);
+            states.push_back(P_D);
+            states.push_back(F_CLOSE);
+            states.push_back(B_CLOSE);
+            states.push_back(L_TURNOPEN);
+            states.push_back(R_TURNOPEN);
+            states.push_back(L_CLOSE);
+            states.push_back(R_CLOSE);
+
+        }
+	else if(instruction == 'C'){
+            states.push_back(L_TURNOPEN);
+            states.push_back(L_CLOSE);
+            states.push_back(R_TURNOPEN);
+            states.push_back(R_CLOSE);
+            states.push_back(F_OPEN);
+            states.push_back(B_OPEN);
+            //take pic
+            states.push_back(L_ACW_R_CW);
+            states.push_back(F_CLOSE);
+            states.push_back(B_CLOSE);
+            states.push_back(L_TURNOPEN);
+            states.push_back(L_CLOSE);
+            states.push_back(R_TURNOPEN);
+            states.push_back(R_CLOSE);
+            states.push_back(F_OPEN);
+            states.push_back(B_OPEN);
+            //take pic
+            states.push_back(L_ACW_R_CW);
+            states.push_back(F_CLOSE);
+            states.push_back(B_CLOSE);
+            states.push_back(L_TURNOPEN);
+            states.push_back(L_CLOSE);
+            states.push_back(R_TURNOPEN);
+            states.push_back(R_CLOSE);
+            states.push_back(F_OPEN);
+            states.push_back(B_OPEN);
+            //take pic
+            states.push_back(L_ACW_R_CW);
+            states.push_back(F_CLOSE);
+            states.push_back(B_CLOSE);
+            states.push_back(L_TURNOPEN);
+            states.push_back(L_CLOSE);
+            states.push_back(R_TURNOPEN);
+            states.push_back(R_CLOSE);
+            states.push_back(F_OPEN);
+            states.push_back(B_OPEN);
+            //take_pic
+            states.push_back(F_CLOSE);
+            states.push_back(B_CLOSE);
+            states.push_back(L_TURNOPEN);
+            states.push_back(R_TURNOPEN);
+            states.push_back(F_ACW_B_CW);
+            //take pic
+            states.push_back(F_ACW_B_CW);
+            states.push_back(F_ACW_B_CW);
+            //take pic
+            states.push_back(F_ACW_B_CW);
+            states.push_back(L_CLOSE);
+            states.push_back(R_CLOSE);
+
+        }
+        else if(instruction == 'L'){
             if(!rotated){
                 if(!upL){
                     states.push_back(L_CW);
@@ -792,285 +1012,82 @@ int main(int argc, char **argv) {
         }
     }
 
-    
-    ROS_INFO_STREAM("--- PROCESSING STATES ---");
+    ROS_INFO_STREAM("--- EXECUTING STATES ---");
     for(auto state: states){
+        if (!ros::ok)
+             return 1;
+
         bool has_timedout = false;
         if( state == L_CW){
-            targetLW += WRISTCW;
-            msg.data = targetLW;
-            pub_targetLW.publish(msg);
-            ROS_INFO_STREAM("L_CW");
-            while(abs(degLW - targetLW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("L_CW", targetLW, compLW, -WRIST, -OFFLW, pub_targetLW, msg_target, looper);
         }else if( state == L_ACW){
-            targetLW += WRISTACW;
-            msg.data = targetLW;
-            pub_targetLW.publish(msg);
-            ROS_INFO_STREAM("L_ACW");
-            while(abs(degLW - targetLW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("L_ACW", targetLW, compLW, WRIST, OFFLW, pub_targetLW, msg_target, looper);
         }else if( state == R_CW){
-            targetRW += WRISTCW;
-            msg.data = targetRW;
-            pub_targetRW.publish(msg);
-            ROS_INFO_STREAM("R_CW");
-            while(abs(degRW - targetRW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("R_CW", targetRW, compRW, -WRIST, -OFFRW, pub_targetRW, msg_target, looper);
         }else if( state == R_ACW){
-            targetRW += WRISTACW;
-            msg.data = targetRW;
-            pub_targetRW.publish(msg);
-            ROS_INFO_STREAM("R_ACW");
-            while(abs(degRW - targetRW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("R_ACW", targetRW, compRW, WRIST, OFFRW, pub_targetRW, msg_target, looper);
         }else if( state == F_CW){
-            targetFW += WRISTCW;
-            msg.data = targetFW;
-            pub_targetFW.publish(msg);
-            ROS_INFO_STREAM("F_CW");
-            while(abs(degFW - targetFW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("F_CW", targetFW, compFW, -WRIST, -OFFFW, pub_targetFW, msg_target, looper);
         }else if( state == F_ACW){
-            targetFW += WRISTACW;
-            msg.data = targetFW;
-            pub_targetFW.publish(msg);
-            ROS_INFO_STREAM("F_ACW");
-            while(abs(degFW - targetFW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("F_ACW", targetFW, compFW, WRIST, OFFFW, pub_targetFW, msg_target, looper);
         }else if( state == B_CW){
-            targetBW += WRISTCW;
-            msg.data = targetBW;
-            pub_targetBW.publish(msg);
-            ROS_INFO_STREAM("B_CW");
-            while(abs(degBW - targetBW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("B_CW", targetBW, compBW, -WRIST, -OFFBW, pub_targetBW, msg_target, looper);
         }else if( state == B_ACW){
-            targetBW += WRISTACW;
-            msg.data = targetBW;
-            pub_targetBW.publish(msg);
-            ROS_INFO_STREAM("B_ACW");
-            while(abs(degBW - targetBW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            exec_wrist("B_ACW", targetBW, compBW, WRIST, OFFBW, pub_targetBW, msg_target, looper);
+
         }else if(state == L_OPEN){
-            targetLH = HANDOPEN;
-            msg.data = targetLH;
-            pub_targetLH.publish(msg);
-            ROS_INFO_STREAM("L_OPEN");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degLH - targetLH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degLH;
-                 pub_targetLH.publish(msg);
-            }
-            
+            exec_hand("L_OPEN", targetLH, compLH, HANDOPEN, TIMEOUT, pub_targetLH, msg_target, pub_timeoutLH, msg_timeout, looper);
         }else if(state == L_CLOSE){
-            targetLH = HANDCLOSE;
-            msg.data = targetLH;
-            pub_targetLH.publish(msg);
-            ROS_INFO_STREAM("L_CLOSE");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degLH - targetLH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degLH;
-                 pub_targetLH.publish(msg);
-            }
-
+            exec_hand("L_CLOSE", targetLH, compLH, HANDCLOSE, TIMEOUT, pub_targetLH, msg_target, pub_timeoutLH, msg_timeout, looper);
         }else if(state == R_OPEN){
-            targetRH = HANDOPEN;
-            msg.data = targetRH;
-            pub_targetRH.publish(msg);
-            ROS_INFO_STREAM("R_OPEN");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degRH - targetRH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degRH;
-                 pub_targetRH.publish(msg);
-            }
-
+            exec_hand("R_OPEN", targetRH, compRH, HANDOPEN, TIMEOUT, pub_targetRH, msg_target, pub_timeoutRH, msg_timeout, looper);
         }else if(state == R_CLOSE){
-            targetRH = HANDCLOSE;
-            msg.data = targetRH;
-            pub_targetRH.publish(msg);
-            ROS_INFO_STREAM("R_CLOSE");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degRH - targetRH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degRH;
-                 pub_targetRH.publish(msg);
-            }
-
+            exec_hand("R_CLOSE", targetRH, compRH, HANDCLOSE, TIMEOUT, pub_targetRH, msg_target, pub_timeoutRH, msg_timeout, looper);
         }else if(state == F_OPEN){
-            targetFH = HANDOPEN;
-            msg.data = targetFH;
-            pub_targetFH.publish(msg);
-            ROS_INFO_STREAM("F_OPEN");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degFH - targetFH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degFH;
-                 pub_targetFH.publish(msg);
-            }
-
+            exec_hand("F_OPEN", targetFH, compFH, HANDOPEN, TIMEOUT, pub_targetFH, msg_target, pub_timeoutFH, msg_timeout, looper);
         }else if(state == F_CLOSE){
-            targetFH = HANDCLOSE;
-            msg.data = targetFH;
-            pub_targetFH.publish(msg);
-            ROS_INFO_STREAM("F_CLOSE");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degFH - targetFH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degFH;
-                 pub_targetFH.publish(msg);
-            }
-
+            exec_hand("F_CLOSE", targetFH, compFH, HANDCLOSE, TIMEOUT, pub_targetFH, msg_target, pub_timeoutFH, msg_timeout, looper);
         }else if(state == B_OPEN){
-            targetBH = HANDOPEN;
-            msg.data = targetBH;
-            pub_targetBH.publish(msg);
-            ROS_INFO_STREAM("B_OPEN");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degBH - targetBH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degBH;
-                 pub_targetBH.publish(msg);
-            }
-
+            exec_hand("B_OPEN", targetBH, compBH, HANDOPEN, TIMEOUT, pub_targetBH, msg_target, pub_timeoutBH, msg_timeout, looper);
         }else if(state == B_CLOSE){
-            targetBH = HANDCLOSE;
-            msg.data = targetBH;
-            pub_targetBH.publish(msg);
-            ROS_INFO_STREAM("B_CLOSE");
-            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degBH - targetBH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-                if (ros::WallTime::now() >= timeout)
-                {
-                    has_timedout = true;
-                    break;
-                }
-            }
-            if (has_timedout)
-            {
-                 msg.data = degBH;
-                 pub_targetBH.publish(msg);
-            }
+            exec_hand("B_CLOSE", targetBH, compBH, HANDCLOSE, TIMEOUT, pub_targetBH, msg_target, pub_timeoutBH, msg_timeout, looper);
 
         }else if(state == L_TURNOPEN){
-            targetLW += WRISTCW;
             targetLH = HANDOPEN;
-            msg.data = targetLH;
-            pub_targetLH.publish(msg);
+            msg_target.data = targetLH;
+            pub_targetLH.publish(msg_target);
             ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degLH - targetLH) > THRESH){
+int i = 0;
+            while(ros::ok() && !compLH){
                 ros::spinOnce();
                 looper.sleep();
+++i;
                 if (ros::WallTime::now() >= timeout)
                 {
+ROS_INFO_STREAM(i);
                     has_timedout = true;
                     break;
                 }
             }
+            compLH = false;
             if (has_timedout)
             {
-                 msg.data = degLH;
-                 pub_targetLH.publish(msg);
+                 pub_timeoutLH.publish(msg_timeout);
             }
 
-            msg.data = targetLW;
-            pub_targetLW.publish(msg);
+            targetLW -= WRIST;
+            msg_target.data = targetLW - OFFLW; pub_targetLW.publish(msg_target);
             ROS_INFO_STREAM("L_TURNOPEN");
-            while(abs(degLW - targetLW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
+            while(ros::ok() && !compLW) { ros::spinOnce(); looper.sleep(); }; compLW = false;
+            msg_target.data = targetLW; pub_targetLW.publish(msg_target);
+            while(ros::ok() && !compLW) { ros::spinOnce(); looper.sleep(); }; compLW = false;
+
         }else if(state == R_TURNOPEN){
-            targetRW += WRISTCW;
             targetRH = HANDOPEN;
-            msg.data = targetRH;
-            pub_targetRH.publish(msg);
+            msg_target.data = targetRH;
+            pub_targetRH.publish(msg_target);
             ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degRH - targetRH) > THRESH){
+            while(ros::ok() && !compRH){
                 ros::spinOnce();
                 looper.sleep();
                 if (ros::WallTime::now() >= timeout)
@@ -1079,55 +1096,25 @@ int main(int argc, char **argv) {
                     break;
                 }
             }
+            compRH = false;
             if (has_timedout)
             {
-                 msg.data = degRH;
-                 pub_targetRH.publish(msg);
+                 pub_timeoutRH.publish(msg_timeout);
             }
 
-            msg.data = targetRW;
-            pub_targetRW.publish(msg);
+            targetRW -= WRIST;
+            msg_target.data = targetRW - OFFRW; pub_targetRW.publish(msg_target);
             ROS_INFO_STREAM("R_TURNOPEN");
-            while(abs(degRW - targetRW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
-        }else if(state == F_TURNOPEN){
-            targetFW += WRISTCW;
+            while(ros::ok() && !compRW) { ros::spinOnce(); looper.sleep(); }; compRW = false;
+            msg_target.data = targetRW; pub_targetRW.publish(msg_target);
+            while(ros::ok() && !compRW) { ros::spinOnce(); looper.sleep(); }; compRW = false;
+        }
+            else if(state == F_TURNOPEN){
             targetFH = HANDOPEN;
-            msg.data = targetFH;
-            pub_targetFH.publish(msg);
-        //    ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degFH - targetFH) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-          //      if (ros::WallTime::now() >= timeout)
-          //      {
-          //          has_timedout = true;
-          //          break;
-          //      }
-            }
-          /*  if (has_timedout)
-            {
-                 msg.data = degFH;
-                 pub_targetFH.publish(msg);
-            }
-*/
-
-            msg.data = targetFW;
-            pub_targetFW.publish(msg);
-            ROS_INFO_STREAM("F_TURNOPEN");
-            while(abs(degFW - targetFW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
-        }else if(state == B_TURNOPEN){
-            targetBW += WRISTCW;
-            targetBH = HANDOPEN;
-            msg.data = targetBH;
-            pub_targetBH.publish(msg);
+            msg_target.data = targetFH;
+            pub_targetFH.publish(msg_target);
             ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
-            while(abs(degBH - targetBH) > THRESH){
+            while(ros::ok() && !compFH){
                 ros::spinOnce();
                 looper.sleep();
                 if (ros::WallTime::now() >= timeout)
@@ -1136,41 +1123,113 @@ int main(int argc, char **argv) {
                     break;
                 }
             }
+            compFH = false;
             if (has_timedout)
             {
-                 msg.data = degBH;
-                 pub_targetBH.publish(msg);
+                 pub_timeoutFH.publish(msg_timeout);
             }
 
-            msg.data = targetBW;
-            pub_targetBW.publish(msg);
+            targetFW -= WRIST;
+            msg_target.data = targetFW - OFFFW; pub_targetFW.publish(msg_target);
+            ROS_INFO_STREAM("F_TURNOPEN");
+            while(ros::ok() && !compFW) { ros::spinOnce(); looper.sleep(); }; compFW = false;
+            msg_target.data = targetFW; pub_targetFW.publish(msg_target);
+            while(ros::ok() && !compFW) { ros::spinOnce(); looper.sleep(); }; compFW = false;
+        }else if(state == B_TURNOPEN){
+            targetBH = HANDOPEN;
+            msg_target.data = targetBH;
+            pub_targetBH.publish(msg_target);
+            ros::WallTime timeout = ros::WallTime::now() + ros::WallDuration(TIMEOUT);
+            while(ros::ok() && !compBH){
+                ros::spinOnce();
+                looper.sleep();
+                if (ros::WallTime::now() >= timeout)
+                {
+                    has_timedout = true;
+                    break;
+                }
+            }
+            compBH = false;
+            if (has_timedout)
+            {
+                 pub_timeoutBH.publish(msg_timeout);
+            }
+
+            targetBW -= WRIST;
+            msg_target.data = targetBW - OFFBW; pub_targetBW.publish(msg_target);
             ROS_INFO_STREAM("B_TURNOPEN");
-            while(abs(degBW - targetBW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
-            }
-        }else if (state == L_CW_R_ACW){
-            targetLW += WRISTCW;
-            targetRW += WRISTACW;
-            msg.data = targetLW;
-            pub_targetLW.publish(msg);
-            msg.data = targetRW;
-            pub_targetRW.publish(msg);
-            ROS_INFO_STREAM("L_CW_R_ACW");
-            while(abs(degLW - targetLW) > THRESH || abs(degRW - targetRW) > THRESH){
-                ros::spinOnce();
-                looper.sleep();
+            while(ros::ok() && !compBW) { ros::spinOnce(); looper.sleep(); }; compBW = false;
+            msg_target.data = targetBW; pub_targetBW.publish(msg_target);
+            while(ros::ok() && !compBW) { ros::spinOnce(); looper.sleep(); }; compBW = false;
 
+        }else if (state == L_CW_R_ACW){
+            targetLW -= WRIST;
+            targetRW += WRIST;
+            msg_target.data = targetLW;
+            pub_targetLW.publish(msg_target);
+            msg_target.data = targetRW;
+            pub_targetRW.publish(msg_target);
+            ROS_INFO_STREAM("L_CW_R_ACW");
+            while(ros::ok() && (!compLW || !compRW)){
+                ros::spinOnce();
+                looper.sleep();
             }
+            compLW = false;
+            compRW = false;
         }else if (state == L_ACW_R_CW){
-            targetLW += WRISTACW;
-            targetRW += WRISTCW;
-            msg.data = targetLW;
-            pub_targetLW.publish(msg);
-            msg.data = targetRW;
-            pub_targetRW.publish(msg);
+            targetLW += WRIST;
+            targetRW -= WRIST;
+            msg_target.data = targetLW;
+            pub_targetLW.publish(msg_target);
+            msg_target.data = targetRW;
+            pub_targetRW.publish(msg_target);
             ROS_INFO_STREAM("L_ACW_R_CW");
-            while(abs(degLW - targetLW) > THRESH || abs(degRW - targetRW) > THRESH){
+            while(ros::ok() && (!compLW || !compRW)){
+                ros::spinOnce();
+                looper.sleep();
+            }
+            compLW = false;
+            compRW = false;
+        }else if (state == F_ACW_B_CW){
+            targetFW += WRIST;
+            targetBW -= WRIST;
+            msg_target.data = targetFW;
+            pub_targetFW.publish(msg_target);
+            msg_target.data = targetBW;
+            pub_targetBW.publish(msg_target);
+            ROS_INFO_STREAM("F_ACW_B_CW");
+            while(ros::ok() && (!compFW || !compBW)){
+                ros::spinOnce();
+                looper.sleep();
+            }
+            compFW = false;
+            compBW = false;
+        }else if (state == P_U){
+            targetPP = PUP;
+            msg_target.data = targetPP;
+            pub_targetPP.publish(msg_target);
+            ROS_INFO_STREAM("P_U");
+            while(ros::ok() && !compPP){
+                ros::spinOnce();
+                looper.sleep();
+            }
+            compPP = false;
+        }else if (state == P_M){
+            targetPP = PMID;
+            msg_target.data = targetPP;
+            pub_targetPP.publish(msg_target);
+            ROS_INFO_STREAM("P_M");
+            while(ros::ok() && !compPP){
+                ros::spinOnce();
+                looper.sleep();
+		ROS_INFO_STREAM(compPP << targetPP);
+            }
+            compPP = false;
+        }else if (state == P_D){
+            targetPP = PDOWN;
+            msg_target.data = targetPP;
+            pub_targetPP.publish(msg_target);
+            while(ros::ok() && !compPP){
                 ros::spinOnce();
                 looper.sleep();
             }
@@ -1182,106 +1241,8 @@ int main(int argc, char **argv) {
     pub_stop.publish(msg_stop);
     ROS_INFO_STREAM("==== MASTER STOPPED ====");
 
-/*    while(ros::ok())
-    {
-        looper.sleep();
-        ros::spinOnce();
-    }
-/*
-    std::vector<int> targets1 = {140}; // Wrist
-    std::vector<int> targets2 = {0}; // Claw  1/6 {180, -180, 360, -360};
-    std::vector<int> targets3 = {0}; // Claw 1/6 {180, -180, 360, -360};
-    std::vector<int> targets4 = {0}; // Wrist {180, -180, 360, -360};
-
-    msg.data = targets1[0];
-    pub_target1.publish(msg);
-    msg.data = targets2[0];
-    pub_target2.publish(msg);
-    msg.data = targets3[0];
-    pub_target3.publish(msg);
-    msg.data = targets4[0];
-    pub_target4.publish(msg);
-    ros::spinOnce();
-
-    bool done1 = false;
-    bool done2 = false;
-    bool done3 = false;
-    bool done4 = false;
-
-    int i1 = 0, i2 = 0, i3 = 0, i4 = 0;
-    while (ros::ok() && !(done1 && done2 && done3 && done4)){
-        if (!done1 && abs(deg1 - targets1[i1]) < THRESH){
-            i1++;
-            if (targets1.size() <= i1){
-                done1 = true;
-                ROS_INFO_STREAM("1 reached");
-            } else {
-                msg.data = targets1[i1];
-                pub_target1.publish(msg);
-                ROS_INFO_STREAM("1 Changed Target");
-            }
-        }
-        if (!done2 && abs(deg2 - targets2[i2]) < THRESH){
-            i2++;
-            if (targets2.size() <= i2){
-                done2 = true;
-                ROS_INFO_STREAM("2 Reached");
-            } else {
-                msg.data = targets2[i2];
-                pub_target2.publish(msg);
-                ROS_INFO_STREAM("2 Changed Target");
-            }
-        }
-        if (!done3 && abs(deg3 - targets3[i3]) < THRESH){
-            i3++;
-            if (targets3.size() <= i3){
-                done3 = true;
-                ROS_INFO_STREAM("3 Reached");
-            } else {
-                msg.data = targets3[i3];
-                pub_target3.publish(msg);
-                ROS_INFO_STREAM("3 Changed Target");
-            }
-        }
-        if (!done4 && abs(deg4 - targets4[i4]) < THRESH){
-            i4++;
-            if (targets4.size() <= i4){
-                done4 = true;
-                ROS_INFO_STREAM("4 Reached");
-            } else {
-                msg.data = targets4[i4];
-                pub_target4.publish(msg);
-                ROS_INFO_STREAM("4 Changed Target");
-            }
-        }
-        looper.sleep();
-        ros::spinOnce();
-    }
-
-
-*/
-
-    // ====================== RESET ==========================
-    std::vector<int> pins = {14 , 6, 15, 13, 7, 12};
-    std::vector<int> pins_pwm = {1, 8};
-    for (auto i : pins)
-    {
-         pinMode(i, OUTPUT);
-         digitalWrite(i, 0);
-    }
-
-    for (auto i : pins_pwm)
-    {
-        softPwmCreate(i, 0, 100);
-        softPwmWrite(i, 20);
-    }
-    ros::Duration(5).sleep();
-
-    for (auto i : pins_pwm)
-    {
-        softPwmWrite(i, 0);
-    }
-
-    ROS_INFO_STREAM("==== MASTER RESETTED & EXITING ====");
+    ros::Duration(2).sleep(); // makes sure the stop is published
+//    ros::spin();
     return 0;
+
 }

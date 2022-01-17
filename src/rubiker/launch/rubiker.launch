@@ -1,12 +1,8 @@
 <?xml version="1.0"?>
 <launch>
-    <node pkg="rubiker" type="pid" name="pidLW" output="screen" args="$(env MotorLW)"/>
-    <node pkg="rubiker" type="pid" name="pidLH" output="screen" args="$(env MotorLH)"/>
-    <node pkg="rubiker" type="pid" name="pidRW" output="screen" args="$(env MotorRW)"/>
-    <node pkg="rubiker" type="pid" name="pidRH" output="screen" args="$(env MotorRH)"/>
-    <node pkg="rubiker" type="master" name="master" output="screen" args="$(env instructions)" /> <!--required="true"/>-->
-    <node pkg="rubiker" type="tacho" name="tachoLW" output="screen" args="$(env MotorLW)"/>
-    <node pkg="rubiker" type="tacho" name="tachoLH" output="screen" args="$(env MotorLH)"/>
-    <node pkg="rubiker" type="tacho" name="tachoRW" output="screen" args="$(env MotorRW)"/>
-    <node pkg="rubiker" type="tacho" name="tachoRH" output="screen" args="$(env MotorRH)"/>
+    <node pkg="rubiker" type="motor" name="motorLW" output="screen" args="$(env MotorLW)"/>
+    <node pkg="rubiker" type="motor" name="motorLH" output="screen" args="$(env MotorLH)"/>
+    <node pkg="rubiker" type="motor" name="motorRW" output="screen" args="$(env MotorRW)"/>
+    <node pkg="rubiker" type="motor" name="motorRH" output="screen" args="$(env MotorRH)"/>
+    <node pkg="rubiker" type="master" name="master" output="screen" args="$(env master)" /> <!--required="true"/>-->
 </launch>
