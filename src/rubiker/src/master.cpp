@@ -267,8 +267,15 @@ int main(int argc, char **argv) {
   };
   auto exec_hand = [&](ros::Publisher & pub_cmd, std::string verbose, int HAND, int TIMEOUT, bool &ack) {
     ROS_INFO_STREAM(verbose);
-    cmd_pos(pub_cmd, HAND, 100, false, 'h');
-    wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'h');
+    cmd_pos(pub_cmd, HAND, 100, false, 'c');
+    wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'c');
+    if(HAND == HANDOPEN){
+        cmd_on(pub_cmd, -20);
+        wait_ack(ack);
+    }else{
+        cmd_on(pub_cmd, 20);
+        wait_ack(ack);
+    }
   };
   auto get_face = [&](std::string verbose) {
     ROS_INFO_STREAM(verbose);
@@ -276,10 +283,10 @@ int main(int argc, char **argv) {
   };
   for (int stage=0; stage<2; ++stage)
 {
-  if (stage == 1) {
+  if (stage == 0) {
     ROS_INFO_STREAM("====== Stage A: Collecting from Camera ======");
   }
-  else if (stage == 2) {
+  else if (stage == 1) {
     ROS_INFO_STREAM("====== Stage B: Executing Instructions: " << instructions << "======");
     ROS_INFO_STREAM("Press ENTER to continue");
     std::cin.get();
