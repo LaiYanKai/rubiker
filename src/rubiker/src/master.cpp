@@ -1,7 +1,6 @@
 #include <ros/ros.h>
 #include <stdlib.h>
-#include "std_msgs/Int32.h"
-#include "std_msgs/Bool.h"
+#include "std_msgs/String.h"
 #include "std_msgs/Empty.h"
 #include <wiringPi.h>
 #include <softPwm.h>
@@ -51,6 +50,13 @@ void cbAckFW(const rubiker::MotorAck::ConstPtr &msg) {  ackFW = true;}
 void cbAckBH(const rubiker::MotorAck::ConstPtr &msg) {  ackBH = true;}
 void cbAckFH(const rubiker::MotorAck::ConstPtr &msg) {  ackFH = true;}
 void cbAckBW(const rubiker::MotorAck::ConstPtr &msg) {  ackBW = true;}
+
+bool ackInst = false;
+std::string inst = "";
+void cbInst(cost std_msgs::String &msg) {
+  std::string instructions = msg->data;
+  ackInst = true;
+}
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "master");
@@ -103,6 +109,10 @@ int main(int argc, char **argv) {
   ros::Publisher pub_cmdFH = nm.advertise<std_msgs::Int32>("cmdFH", 1, true);
   ros::Publisher pub_cmdBW = nm.advertise<std_msgs::Int32>("cmdBW", 1, true);
   ros::Publisher pub_cmdPP = nm.advertise<std_msgs::Int32>("cmdPP", 1, true);
+
+  // setup with vision
+  ros::Publisher pub_getface = nm.advertise<std_msgs::Empty>("getface", 1, true);
+  ros::Subscriber sub_inst = nm.subscribe("instructions", 1, cbInst);
 
   int targetLH = 0, targetLW = 0, targetRH = 0, targetRW = 0,
       targetBH = 0, targetBW = 0, targetFH = 0, targetFW = 0, targetPP = 0;

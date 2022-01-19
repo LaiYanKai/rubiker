@@ -9,7 +9,7 @@ import tflite_runtime.interpreter as tflite
 import kociemba
 
 #import model
-interpreter = tflite.Interpreter(model_path="/home/ubuntu/catkin_ws/model.tflite")
+interpreter = tflite.Interpreter(model_path="/home/ubuntu/rubiker/model.tflite")
 interpreter.allocate_tensors()
 tmp = interpreter.get_input_details()
 interpreter_in_idx = tmp[0]['index']
