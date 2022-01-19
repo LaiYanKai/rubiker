@@ -54,10 +54,11 @@ void cbAckFH(const rubiker::MotorAck::ConstPtr &msg) {  ackFH = true;}
 void cbAckBW(const rubiker::MotorAck::ConstPtr &msg) {  ackBW = true;}
 
 bool ackInst = false;
-std::string inst = "";
+std::string instructions = "";
 void cbInst(const std_msgs::String::ConstPtr &msg) {
-  std::string instructions = msg->data;
+  instructions = msg->data;
   ackInst = true;
+  ROS_INFO_STREAM("I received1");
 }
 
 int main(int argc, char **argv) {
@@ -116,6 +117,8 @@ int main(int argc, char **argv) {
   ros::Publisher pub_getface = nm.advertise<std_msgs::Empty>("getface", 1, true);
   ros::Subscriber sub_inst = nm.subscribe("instructions", 1, cbInst);
 
+  while (ros::ok() && !ackInst) { ros::spinOnce(); };  ackInst = false;  ROS_INFO("Vision acknowledged");
+
   int targetLH = 0, targetLW = 0, targetRH = 0, targetRW = 0,
       targetBH = 0, targetBW = 0, targetFH = 0, targetFW = 0, targetPP = 0;
 
@@ -154,6 +157,7 @@ int main(int argc, char **argv) {
     msg_cmd.type = 'p';
     msg_cmd.end = end;
     msg_cmd.target = target;
+   ROS_INFO_STREAM("SENTTGT" << target);
     msg_cmd.speed = max_speed;
     msg_cmd.relative = relative;
     msg_cmd.duration = 0;

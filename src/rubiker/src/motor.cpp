@@ -72,8 +72,10 @@ void cbCmd(const rubiker::MotorCmd::ConstPtr& msg) {
     relative = msg->relative;
     if (relative)
       target = deg + msg->target;
-    else
+    else {
       target = msg->target;
+      ROS_INFO_STREAM("GETTGT" << target);
+    }
     next_end = msg->end;
   } else if (state == 'o') { // on at speed
     speed = msg->speed;
@@ -184,12 +186,14 @@ int main (int argc, char **argv)
       if (verbose) { ROS_INFO_STREAM(MTR << ": Timed " << speed << "\% for " << duration << "s"); }; // note speed will be limited max_speed after pwms
       pwm();
       ros::WallTime t = ros::WallTime::now() + ros::WallDuration(duration);
-      while (ros::WallTime::now() <= t) {
+      while (ros::ok() && run && !changed_cmd && ros::WallTime::now() <= t) {
           verbose_deg();
       }
+      if (changed_cmd)
+        continue;
+      ack();
       target = deg; // for holding at end or next loop pid
       pid_reset(); // for holding at end or next loop pid
-      ack();
     } else if (state == 'p') { // position
       if (verbose) { ROS_INFO_STREAM(MTR << ": Target " << target << " at max " << max_speed << "\%"); };
       pid_reset();
@@ -204,6 +208,8 @@ int main (int argc, char **argv)
         rate.sleep();
         ros::spinOnce();
       }
+      if (changed_cmd)
+        continue;
     } else if (state == 'o') { // on at speed
       max_speed = 100;
       pwm();
@@ -214,6 +220,8 @@ int main (int argc, char **argv)
         rate.sleep();
         ros::spinOnce();
       }
+      if (changed_cmd)
+        continue;
       target = deg; // for holding at end or next loop pid
       pid_reset(); // for holding at end or next loop pid
     } else if (state == 'f') {
@@ -227,7 +235,7 @@ int main (int argc, char **argv)
       ROS_WARN_STREAM("Invalid state " << state << " received");
     }
 
-    if (changed_cmd) { continue; }
+    // if (changed_cmd) { continue; }
 
     // handle end action
     if (end == 'h') {

@@ -5,4 +5,5 @@
     <node pkg="rubiker" type="motor" name="motorRW" output="screen" args="$(env MotorRW)"/>
     <node pkg="rubiker" type="motor" name="motorRH" output="screen" args="$(env MotorRH)"/>
     <node pkg="rubiker" type="master" name="master" output="screen" args="$(env master)" /> <!--required="true"/>-->
+    <node pkg="rubiker" type="vision.py" name="vision" output="screen" args="$(env Vision)" />
 </launch>

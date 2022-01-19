@@ -21,13 +21,14 @@ face_requested = False
 
 def cbFace(msg):
   global face_requested
+  print("face requested")
   face_requested = True
 
 def main(gamma, coords):
   rospy.init_node('vision')
   global face_requested
 
-  pub = rospy.Publisher('instructions', String, queue_size=1)
+  pub = rospy.Publisher('instructions', String, queue_size=1, latch=True)
   sub = rospy.Subscriber('getface', Empty, cbFace)
 
   cap = cv2.VideoCapture(0)
@@ -43,6 +44,8 @@ def main(gamma, coords):
 
   color_to_pos = ['', '', '', '', '', '']
   colors = [[0 for j in range(9)] for i in range(6)]
+
+  pub.publish("1");
 
   pos = ['U', 'R', 'F', 'D', 'L', 'B']
   for f in range(6):
@@ -95,7 +98,7 @@ def main(gamma, coords):
   kociemba_input = ""
   for f in range(6):
     for i in range(8, -1, -1):
-      kociemba_input += color_to_pos[colors[f][i]-1]
+	      kociemba_input += color_to_pos[colors[f][i]-1]
 
   kociemba_output =  kociemba.solve(kociemba_input)
   kociemba_output = kociemba_output.split(" ")
