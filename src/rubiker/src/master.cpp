@@ -6,6 +6,7 @@
 #include <softPwm.h>
 #include "rubiker/MotorCmd.h"
 #include "rubiker/MotorAck.h"
+#include <iostream>
 
 enum State { L_CW, L_ACW, L_CLOSE, L_OPEN, 
   R_CW,  R_ACW,  R_CLOSE,  R_OPEN,  
@@ -15,6 +16,7 @@ enum State { L_CW, L_ACW, L_CLOSE, L_OPEN,
   L_CW_R_ACW,  L_ACW_R_CW,
   P_U,  P_D,
   F_ACW_B_CW,  F_CW_B_ACW,
+  GETFACE
 };
 
 // These will be overwritten by arguments to main
@@ -53,7 +55,7 @@ void cbAckBW(const rubiker::MotorAck::ConstPtr &msg) {  ackBW = true;}
 
 bool ackInst = false;
 std::string inst = "";
-void cbInst(cost std_msgs::String &msg) {
+void cbInst(const std_msgs::String::ConstPtr &msg) {
   std::string instructions = msg->data;
   ackInst = true;
 }
@@ -100,15 +102,15 @@ int main(int argc, char **argv) {
   while (ros::ok() && !ackBW) { ros::spinOnce(); };  ackBW = false;  ROS_INFO("BW acknowledged");
   while (ros::ok() && !ackPP) { ros::spinOnce(); };  ackPP = false;  ROS_INFO("PP acknowledged");
 
-  ros::Publisher pub_cmdLW = nm.advertise<std_msgs::Int32>("cmdLW", 1, true);
-  ros::Publisher pub_cmdRH = nm.advertise<std_msgs::Int32>("cmdRH", 1, true);
-  ros::Publisher pub_cmdLH = nm.advertise<std_msgs::Int32>("cmdLH", 1, true);
-  ros::Publisher pub_cmdRW = nm.advertise<std_msgs::Int32>("cmdRW", 1, true);
-  ros::Publisher pub_cmdFW = nm.advertise<std_msgs::Int32>("cmdFW", 1, true);
-  ros::Publisher pub_cmdBH = nm.advertise<std_msgs::Int32>("cmdBH", 1, true);
-  ros::Publisher pub_cmdFH = nm.advertise<std_msgs::Int32>("cmdFH", 1, true);
-  ros::Publisher pub_cmdBW = nm.advertise<std_msgs::Int32>("cmdBW", 1, true);
-  ros::Publisher pub_cmdPP = nm.advertise<std_msgs::Int32>("cmdPP", 1, true);
+  ros::Publisher pub_cmdLW = nm.advertise<rubiker::MotorCmd>("cmdLW", 1, true);
+  ros::Publisher pub_cmdRH = nm.advertise<rubiker::MotorCmd>("cmdRH", 1, true);
+  ros::Publisher pub_cmdLH = nm.advertise<rubiker::MotorCmd>("cmdLH", 1, true);
+  ros::Publisher pub_cmdRW = nm.advertise<rubiker::MotorCmd>("cmdRW", 1, true);
+  ros::Publisher pub_cmdFW = nm.advertise<rubiker::MotorCmd>("cmdFW", 1, true);
+  ros::Publisher pub_cmdBH = nm.advertise<rubiker::MotorCmd>("cmdBH", 1, true);
+  ros::Publisher pub_cmdFH = nm.advertise<rubiker::MotorCmd>("cmdFH", 1, true);
+  ros::Publisher pub_cmdBW = nm.advertise<rubiker::MotorCmd>("cmdBW", 1, true);
+  ros::Publisher pub_cmdPP = nm.advertise<rubiker::MotorCmd>("cmdPP", 1, true);
 
   // setup with vision
   ros::Publisher pub_getface = nm.advertise<std_msgs::Empty>("getface", 1, true);
@@ -119,6 +121,7 @@ int main(int argc, char **argv) {
 
   ros::Rate looper(20);
   rubiker::MotorCmd msg_cmd;
+  std_msgs::Empty msg_getface;
 
   bool upL = true, upR = true, upF = true, upB = true,
        cL = true, cR = true, cF = true, cB = true, rotated = false;
@@ -196,7 +199,6 @@ int main(int argc, char **argv) {
     msg_cmd.duration = 0;
     pub_cmd.publish(msg_cmd);
   };
-
   auto wait_ack = [&](bool &ack) {
     while (!ack && ros::ok()) {
       ros::spinOnce();
@@ -226,6 +228,14 @@ int main(int argc, char **argv) {
     ack = false;
     if (has_timedout)
       cmd_timeout(pub_cmd, end);
+  };
+  auto wait_instructions = [&]()
+  {
+    while (ros::ok() && !ackInst) {
+      ros::spinOnce();
+      looper.sleep();
+    }
+    ackInst = false;
   };
   auto exec_wrist_cal = [&](ros::Publisher & pub_cmd, std::string verbose, int &target, int WRIST, int CAL, float CALDUR, float CALSPD, bool &ack) {
     ROS_INFO_STREAM(verbose);
@@ -260,7 +270,20 @@ int main(int argc, char **argv) {
     cmd_pos(pub_cmd, HAND, 100, false, 'h');
     wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'h');
   };
-
+  auto get_face = [&](std::string verbose) {
+    ROS_INFO_STREAM(verbose);
+    pub_getface.publish(msg_getface);
+  };
+  for (int stage=0; stage<2; ++stage)
+{
+  if (stage == 1) {
+    ROS_INFO_STREAM("====== Stage A: Collecting from Camera ======");
+  }
+  else if (stage == 2) {
+    ROS_INFO_STREAM("====== Stage B: Executing Instructions: " << instructions << "======");
+    ROS_INFO_STREAM("Press ENTER to continue");
+    std::cin.get();
+  }
   for (auto instruction : instructions) {
     ROS_INFO_STREAM("Instruction: " << instruction);
     if (instruction == 'P') {
@@ -347,20 +370,20 @@ int main(int argc, char **argv) {
       states.push_back(R_CLOSE);
       states.push_back(F_OPEN);
       states.push_back(B_OPEN);
-      //take pic
+      states.push_back(GETFACE);
       states.push_back(F_CLOSE);
       states.push_back(B_CLOSE);
       states.push_back(L_TURNOPEN);
       states.push_back(R_TURNOPEN);
       states.push_back(F_ACW_B_CW);
-      //take pic
+      states.push_back(GETFACE);
       states.push_back(F_CW_B_ACW);
       states.push_back(L_CLOSE);
       states.push_back(R_CLOSE);
       states.push_back(F_OPEN);
       states.push_back(B_OPEN);
       states.push_back(L_ACW_R_CW);
-      //take pic
+      states.push_back(GETFACE);
       states.push_back(F_CLOSE);
       states.push_back(B_CLOSE);
       states.push_back(L_TURNOPEN);
@@ -370,7 +393,7 @@ int main(int argc, char **argv) {
       states.push_back(F_OPEN);
       states.push_back(B_OPEN);
       states.push_back(L_ACW_R_CW);
-      //take pic
+      states.push_back(GETFACE);
       states.push_back(L_ACW_R_CW);
       states.push_back(L_ACW_R_CW);
       states.push_back(F_CLOSE);
@@ -386,7 +409,7 @@ int main(int argc, char **argv) {
       states.push_back(L_OPEN);
       states.push_back(R_OPEN);
       states.push_back(F_CW_B_ACW);
-      //take pic
+      states.push_back(GETFACE);
       states.push_back(F_ACW_B_CW);
       states.push_back(L_CLOSE);
       states.push_back(R_CLOSE);
@@ -400,7 +423,7 @@ int main(int argc, char **argv) {
       states.push_back(R_CLOSE);
       states.push_back(L_ACW_R_CW);
       states.push_back(L_ACW_R_CW);
-      // take pic
+      states.push_back(GETFACE);
       states.push_back(L_ACW_R_CW);
       states.push_back(L_ACW_R_CW);
       states.push_back(F_CLOSE);
@@ -1171,9 +1194,13 @@ int main(int argc, char **argv) {
       ROS_INFO_STREAM("P_D");
       cmd_time(pub_cmdPP, PTIME, 50, 'b');
       wait_ack(ackPP);
+    } else if (state == GETFACE) {
+      get_face("GETFACE");
+      wait_instructions();
     }
     ROS_INFO_STREAM("---");
   }
+}
 
   // ================ STOP ===================
   cmd_stop(pub_cmdLW);
