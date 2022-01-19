@@ -2,22 +2,21 @@
 source devel/setup.bash
 echo "BASH SOURCED"
 
-sudo ip ad add 10.0.0.1/24 dev eth0
+sudo ip addr add 10.0.0.1/24 dev eth0
 sudo ip link set dev eth0 up
-export ROS_HOSTNAME=10.0.0.1
-export ROS_MASTER_URI=http://10.0.0.1:11311
 
-# 		MTR 	K(BCM)	W(BCM)	Y(BCM) B(BCM) 	KP 	KI 	KD 	ErrThrs	LR Verbose
-export MotorLW="LW	15	14	18	23	1.5	0.001	2	5	40 1"
-export MotorRH="RH	25	24	12	16	2.0	0.001	2	5	40 0"
-export MotorLH="LH	17	27	20	21	2.0	0.002	2	5	40 0"
-export MotorRW="RW	6	5	19	26	1.5	0.001	2	5	40 1"
-# 		Instructions	WRISTAW H{OC} 	TIMEOUT OFFW{L,R,F,B}	PTIME	CAL{DST}
-export master="	F		540	0 660	1.00	90 90 90 90	0.9	100 1.0 50"
+# 		MTR 	K(BCM)	W(BCM)	Y(BCM) 	B(BCM) 	KP 	KI 	KD 	ErrThrs	LR
+#export MotorLW="LW	15	14	23	18	1.5	0.001	2	5	40 1" #M5 #+ACW -CW
+#export MotorRH="RH	25	24	16	12	2.0	0.001	2	5	40 1" #M2 #+Close -Open #may have loose K and W wires
+#export MotorLH="LH	6	5	26	19	2.0	0.002	2	5	40 1" #M4 #+Close -Open
+export MotorRW="RW	17	27	21	20	1.5	0.001	2	5	40 1" #M1 
+#		Instructions	WRISTAW	H{OC}	TIMEOUT	OFFW{LRFB}	PTIME	CAL{DST}
+export master="	F		270	0 330	1.00	90 90 90 90	0.9	100 50 1.0
+
 #bdLFt
-#BfTlRF -- 13 sec
-#tBDflRbrd -- 30 sec
-#lRTbdLFL -- 30 sec
-#tfTrfbDl -- 36 sec
+#BfTlRF -- 13 s
+#tBDflRbrd -- 30s
+#lRTbdLFL -- 30s
+#tfTrfbDl -- 36s
 
 roslaunch rubiker run.launch
