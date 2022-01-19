@@ -16,13 +16,13 @@ int target = 0;
 float duration = 0.0;
 float speed = 0;
 float max_speed = 100;
-char state = 'o';
-char next_end = 'c';
+char state = 'f';
+char next_end = 'h';
 bool changed_deg = true;
 
 // other global inits
 int ACCEPTABLE_ERROR = 0;
-int LOOP_RATE = 0;
+float LOOP_RATE = 0;
 int PIN_Y = 0;
 int PIN_B = 0;
 int deg = 0;
@@ -66,11 +66,9 @@ void cbCmd(const rubiker::MotorCmd::ConstPtr& msg) {
     duration = msg->duration;
     next_end = msg->end;
   } else if (state == 'p') { // position
-    max_speed = msg->speed; // max speed
+    max_speed = abs(msg->speed); // max speed
     if (max_speed > 100)
       max_speed = 100;
-    else if (max_speed < -100)
-      max_speed = -100;
     relative = msg->relative;
     if (relative)
       target = deg + msg->target;
@@ -101,8 +99,8 @@ int main (int argc, char **argv)
   float KI = strtof(argv[7], nullptr);
   float KD = strtof(argv[8], nullptr);
   ACCEPTABLE_ERROR = strtol(argv[9], nullptr, 0);
-  LOOP_RATE = strtof(argv[11], nullptr);
-  verbose = strtol(argv[12], nullptr, 0);
+  LOOP_RATE = strtof(argv[10], nullptr);
+  verbose = strtol(argv[11], nullptr, 0);
   ROS_INFO("%2s --> K:%02d  W:%02d  Y:%02d  B:%02d  KP:%9.5f  KI:%9.5f  KD:%9.5f  AE:%d  LRATE:%f  Verbose:%d",
     MTR.c_str(), PIN_K, PIN_W, PIN_Y, PIN_B, KP, KI, KD, ACCEPTABLE_ERROR, LOOP_RATE, verbose);
 
@@ -128,10 +126,10 @@ int main (int argc, char **argv)
   ros::Rate rate(LOOP_RATE);
 
   // lambdas
-  auto ack = [&]() { 
-    msg_ack.seq = seq; 
+  auto ack = [&]() {
+    msg_ack.seq = seq;
     msg_ack.deg = deg;
-    pub_ack.publish(msg_ack); 
+    pub_ack.publish(msg_ack);
   }; // acknowledge
   auto pwm = [&]() { // pwm
     if (speed >= 0) {
@@ -166,8 +164,8 @@ int main (int argc, char **argv)
     }
   };
 
-  // Acknowledge
-  ack();
+  // Acknowledge (via OFF below, state is defaulted to 'f')
+  // ack();
 
   // Main Loop
   while (ros::ok() && run) {
@@ -183,15 +181,17 @@ int main (int argc, char **argv)
       ack();
     } else if (state == 't') { // timed
       max_speed = 100;
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Timed " << speed << "\% for " << duration << "s"); }; // note speed will be limited max_speed after pwms
       pwm();
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Timed " << speed << "\% for " << duration << "s") }; // note speed will be limited max_speed after pwms
-      ros::Duration{duration}.sleep();
-      verbose_deg();
+      ros::WallTime t = ros::WallTime::now() + ros::WallDuration(duration);
+      while (ros::WallTime::now() <= t) {
+          verbose_deg();
+      }
       target = deg; // for holding at end or next loop pid
       pid_reset(); // for holding at end or next loop pid
       ack();
     } else if (state == 'p') { // position
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Target " << target << " at max " << max_speed << "\%") };
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Target " << target << " at max " << max_speed << "\%"); };
       pid_reset();
       while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
@@ -208,7 +208,7 @@ int main (int argc, char **argv)
       max_speed = 100;
       pwm();
       ack();
-      if (verbose) { ROS_INFO_STREAM(MTR << ": On at " << target << "\%") }; // note speed will be limited max_speed after pwm
+      if (verbose) { ROS_INFO_STREAM(MTR << ": On at " << speed << "\%"); }; // note speed will be limited max_speed after pwm
       while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
         rate.sleep();
@@ -218,10 +218,11 @@ int main (int argc, char **argv)
       pid_reset(); // for holding at end or next loop pid
     } else if (state == 'f') {
       ack();
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Off") };
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Off"); };
     } else if (state == 'r') {
       deg = target;
       ack();
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Reset to " << deg << " degrees"); };
     } else {
       ROS_WARN_STREAM("Invalid state " << state << " received");
     }
@@ -230,7 +231,7 @@ int main (int argc, char **argv)
 
     // handle end action
     if (end == 'h') {
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Holding") };
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Holding"); };
       while (ros::ok() && run && !changed_cmd) {
         verbose_deg();
         pid();
@@ -239,7 +240,7 @@ int main (int argc, char **argv)
         ros::spinOnce();
       }
     } else if (end == 'c') {
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Coasting") };
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Coasting"); };
       softPwmWrite(PIN_K, 0);
       softPwmWrite(PIN_W, 0);
       while (ros::ok() && run && !changed_cmd) {
@@ -248,7 +249,7 @@ int main (int argc, char **argv)
         ros::spinOnce();
       }
     } else {
-      if (verbose) { ROS_INFO_STREAM(MTR << ": Braking") };
+      if (verbose) { ROS_INFO_STREAM(MTR << ": Braking"); };
       softPwmWrite(PIN_K, 100);
       softPwmWrite(PIN_W, 100);
       while (ros::ok() && run && !changed_cmd) {

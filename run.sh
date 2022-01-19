@@ -13,7 +13,7 @@ export MotorRH="RH	25	24	12	16	2.0	0.001	2	5	40 0"
 export MotorLH="LH	17	27	20	21	2.0	0.002	2	5	40 0"
 export MotorRW="RW	6	5	19	26	1.5	0.001	2	5	40 1"
 # 		Instructions	WRISTAW H{OC} 	TIMEOUT OFFW{L,R,F,B}	PTIME	CAL{DST}
-export master="	pCP		540	0 660	1.00	90 90 90 90	0.9	100 1.0 50"
+export master="	F		540	0 660	1.00	90 90 90 90	0.9	100 1.0 50"
 #bdLFt
 #BfTlRF -- 13 sec
 #tBDflRbrd -- 30 sec

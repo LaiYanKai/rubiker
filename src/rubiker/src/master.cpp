@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     msg_cmd.speed = 0;
     msg_cmd.duration = 0;
     msg_cmd.relative = false;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_stop = [&](ros::Publisher & pub_cmd) {
     msg_cmd.seq++;
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
     msg_cmd.speed = 0;
     msg_cmd.duration = 0;
     msg_cmd.relative = false;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_pos = [&](ros::Publisher & pub_cmd, int target, float max_speed, bool relative, char end) {
     msg_cmd.seq++;
@@ -144,17 +144,17 @@ int main(int argc, char **argv) {
     msg_cmd.speed = max_speed;
     msg_cmd.relative = relative;
     msg_cmd.duration = 0;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_time = [&](ros::Publisher & pub_cmd, float duration, float speed, char end) {
     msg_cmd.seq++;
     msg_cmd.type = 't';
     msg_cmd.end = end;
     msg_cmd.target = 0;
-    msg_cmd.speed = max_speed;
+    msg_cmd.speed = speed;
     msg_cmd.relative = false;
     msg_cmd.duration = duration;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_on = [&](ros::Publisher & pub_cmd, float speed) {
     msg_cmd.seq++;
@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
     msg_cmd.speed = speed;
     msg_cmd.relative = false;
     msg_cmd.duration = 0;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_off = [&](ros::Publisher & pub_cmd, char end) {
     msg_cmd.seq++;
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
     msg_cmd.speed = 0;
     msg_cmd.relative = false;
     msg_cmd.duration = 0;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
   auto cmd_reset = [&](ros::Publisher & pub_cmd, int target, char end) {
     msg_cmd.seq++;
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
     msg_cmd.speed = 0;
     msg_cmd.relative = false;
     msg_cmd.duration = 0;
-    pub_cmd(msg_cmd);
+    pub_cmd.publish(msg_cmd);
   };
 
   auto wait_ack = [&](bool &ack) {
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     if (has_timedout)
       cmd_timeout(pub_cmd, end);
   };
-  auto exec_wrist_cal = (ros::Publisher & pub_cmd, std::string verbose, int &target, int WRIST, int CAL, float CALDUR, float CALSPD, bool &ack) {
+  auto exec_wrist_cal = [&](ros::Publisher & pub_cmd, std::string verbose, int &target, int WRIST, int CAL, float CALDUR, float CALSPD, bool &ack) {
     ROS_INFO_STREAM(verbose);
     target += WRIST;
     cmd_pos(pub_cmd, target + CAL, 100, false, 'h');
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
 
     cmd_time(pub_cmd, CALDUR, CALSPD, 'h');
     wait_ack(ack);
-    cmd_reset(target, 'h');
+    cmd_reset(pub_cmd, target, 'h');
     wait_ack(ack);
   };
   auto exec_wrist = [&](ros::Publisher & pub_cmd, std::string verbose, int &target, int WRIST, int OFFSET, bool &ack) {
@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
     cmd_pos(pub_cmd, HAND, 100, false, 'h');
     wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'h');
   };
-  
+
   for (auto instruction : instructions) {
     ROS_INFO_STREAM("Instruction: " << instruction);
     if (instruction == 'P') {
@@ -1078,53 +1078,53 @@ int main(int argc, char **argv) {
 
     bool has_timedout = false;
     if (state == L_CW) {
-      exec_wrist(cmdLW, "L_CW", targetLW, -WRIST, -OFFLW, ackLW);
+      exec_wrist(pub_cmdLW, "L_CW", targetLW, -WRIST, -OFFLW, ackLW);
     } else if (state == L_ACW) {
-      exec_wrist(cmdLW, "L_ACW", targetLW, WRIST, OFFLW, ackLW);
+      exec_wrist(pub_cmdLW, "L_ACW", targetLW, WRIST, OFFLW, ackLW);
     } else if (state == R_CW) {
-      exec_wrist(cmdRW, "R_CW", targetRW, -WRIST, -OFFRW, ackRW);
+      exec_wrist(pub_cmdRW, "R_CW", targetRW, -WRIST, -OFFRW, ackRW);
     } else if (state == R_ACW) {
-      exec_wrist(cmdRW, "R_ACW", targetRW, WRIST, OFFRW, ackRW);
+      exec_wrist(pub_cmdRW, "R_ACW", targetRW, WRIST, OFFRW, ackRW);
     } else if (state == F_CW) {
-      exec_wrist(cmdFW, "F_CW", targetFW, -WRIST, -OFFFW, ackFW);
+      exec_wrist(pub_cmdFW, "F_CW", targetFW, -WRIST, -OFFFW, ackFW);
     } else if (state == F_ACW) {
-      exec_wrist(cmdFW, "F_ACW", targetFW, WRIST, OFFFW, ackFW);
+      exec_wrist(pub_cmdFW, "F_ACW", targetFW, WRIST, OFFFW, ackFW);
     } else if (state == B_CW) {
-      exec_wrist(cmdBW, "B_CW", targetBW, -WRIST, -OFFBW, ackBW);
+      exec_wrist(pub_cmdBW, "B_CW", targetBW, -WRIST, -OFFBW, ackBW);
     } else if (state == B_ACW) {
-      exec_wrist(cmdBW, "B_ACW", targetBW, WRIST, OFFBW, ackBW);
+      exec_wrist(pub_cmdBW, "B_ACW", targetBW, WRIST, OFFBW, ackBW);
     } else if (state == L_OPEN) {
-      exec_hand(cmdLH, "L_OPEN", HANDOPEN, TIMEOUT, ackLH);
-      exec_wrist_cal(cmdLW, "L_OW", targetLW, 0, -CAL, CALDUR, CALDPS, ackLW);
+      exec_hand(pub_cmdLH, "L_OPEN", HANDOPEN, TIMEOUT, ackLH);
+      exec_wrist_cal(pub_cmdLW, "L_OW", targetLW, 0, -CAL, CALDUR, CALSPD, ackLW);
     } else if (state == L_CLOSE) {
-      exec_hand(cmdLH, "L_CLOSE", HANDCLOSE, TIMEOUT, ackLH);
+      exec_hand(pub_cmdLH, "L_CLOSE", HANDCLOSE, TIMEOUT, ackLH);
     } else if (state == R_OPEN) {
-      exec_hand(cmdRH, "R_OPEN", HANDOPEN, TIMEOUT, ackRH);
-      exec_wrist_cal(cmdRW, "B_OW", targetRW, 0, -CAL, CALDUR, CALDPS, ackRW);
+      exec_hand(pub_cmdRH, "R_OPEN", HANDOPEN, TIMEOUT, ackRH);
+      exec_wrist_cal(pub_cmdRW, "B_OW", targetRW, 0, -CAL, CALDUR, CALSPD, ackRW);
     } else if (state == R_CLOSE) {
-      exec_hand(cmdRH, "R_CLOSE", HANDCLOSE, TIMEOUT, ackRH);
+      exec_hand(pub_cmdRH, "R_CLOSE", HANDCLOSE, TIMEOUT, ackRH);
     } else if (state == F_OPEN) {
-      exec_hand(cmdFH, "F_OPEN", HANDOPEN, TIMEOUT, ackFH);
-      exec_wrist_cal(cmdFW, "F_OW", targetFW, 0, -CAL, CALDUR, CALDPS, ackFW);
+      exec_hand(pub_cmdFH, "F_OPEN", HANDOPEN, TIMEOUT, ackFH);
+      exec_wrist_cal(pub_cmdFW, "F_OW", targetFW, 0, -CAL, CALDUR, CALSPD, ackFW);
     } else if (state == F_CLOSE) {
-      exec_hand(cmdFH, "F_CLOSE", HANDCLOSE, TIMEOUT, ackFH);
+      exec_hand(pub_cmdFH, "F_CLOSE", HANDCLOSE, TIMEOUT, ackFH);
     } else if (state == B_OPEN) {
-      exec_hand(cmdBH, "B_OPEN", HANDOPEN, TIMEOUT, ackBH);
-      exec_wrist_cal(cmdBW, "B_OW", targetBW, 0, -CAL, CALDUR, CALDPS, ackBW);
+      exec_hand(pub_cmdBH, "B_OPEN", HANDOPEN, TIMEOUT, ackBH);
+      exec_wrist_cal(pub_cmdBW, "B_OW", targetBW, 0, -CAL, CALDUR, CALSPD, ackBW);
     } else if (state == B_CLOSE) {
-      exec_hand(cmdBH, "B_CLOSE", HANDCLOSE, TIMEOUT, ackBH);
+      exec_hand(pub_cmdBH, "B_CLOSE", HANDCLOSE, TIMEOUT, ackBH);
     } else if (state == L_TURNOPEN) {
-      exec_hand(cmdLH, "L_TOH", HANDOPEN, TIMEOUT, ackLH);
-      exec_wrist_cal(cmdLW, "L_TOW", targetLW, -WRIST, -CAL, CALDUR, CALDPS, ackLW);
+      exec_hand(pub_cmdLH, "L_TOH", HANDOPEN, TIMEOUT, ackLH);
+      exec_wrist_cal(pub_cmdLW, "L_TOW", targetLW, -WRIST, -CAL, CALDUR, CALSPD, ackLW);
     } else if (state == R_TURNOPEN) {
-      exec_hand(cmdRH, "R_TOH", HANDOPEN, TIMEOUT, ackRH);
-      exec_wrist_cal(cmdRW, "R_TOW", targetRW, -WRIST, -CAL, CALDUR, CALDPS, ackRW);
+      exec_hand(pub_cmdRH, "R_TOH", HANDOPEN, TIMEOUT, ackRH);
+      exec_wrist_cal(pub_cmdRW, "R_TOW", targetRW, -WRIST, -CAL, CALDUR, CALSPD, ackRW);
     } else if (state == F_TURNOPEN) {
-      exec_hand(cmdFH, "F_TOH", HANDOPEN, TIMEOUT, ackFH);
-      exec_wrist_cal(cmdFW, "F_TOW", targetFW, -WRIST, -CAL, CALDUR, CALDPS, ackFW);
+      exec_hand(pub_cmdFH, "F_TOH", HANDOPEN, TIMEOUT, ackFH);
+      exec_wrist_cal(pub_cmdFW, "F_TOW", targetFW, -WRIST, -CAL, CALDUR, CALSPD, ackFW);
     } else if (state == B_TURNOPEN) {
-      exec_hand(cmdBH, "B_TOH", HANDOPEN, TIMEOUT, ackBH);
-      exec_wrist_cal(cmdBW, "B_TOW", targetBW, -WRIST, -CAL, CALDUR, CALDPS, ackBW);
+      exec_hand(pub_cmdBH, "B_TOH", HANDOPEN, TIMEOUT, ackBH);
+      exec_wrist_cal(pub_cmdBW, "B_TOW", targetBW, -WRIST, -CAL, CALDUR, CALSPD, ackBW);
     } else if (state == L_CW_R_ACW) {
       ROS_INFO_STREAM("L_CW_R_ACW");
       targetLW -= WRIST;
@@ -1155,25 +1155,25 @@ int main(int argc, char **argv) {
       wait_ack_two(ackFW, ackBW);
     } else if (state == P_U) {
       ROS_INFO_STREAM("P_U");
-      cmd_time(PUP, PTIME, -50, 'b');
+      cmd_time(pub_cmdPP, PTIME, -50, 'b');
       wait_ack(ackPP);
     } else if (state == P_D) {
       ROS_INFO_STREAM("P_D");
-      cmd_time(PUP, PTIME, 50, 'b');
+      cmd_time(pub_cmdPP, PTIME, 50, 'b');
       wait_ack(ackPP);
     }
     ROS_INFO_STREAM("---");
   }
 
   // ================ STOP ===================
-  cmd_stop(pubLW);
-  cmd_stop(pubRW);
-  cmd_stop(pubFW);
-  cmd_stop(pubBW);
-  cmd_stop(pubLH);
-  cmd_stop(pubRH);
-  cmd_stop(pubFH);
-  cmd_stop(pubBH);
+  cmd_stop(pub_cmdLW);
+  cmd_stop(pub_cmdRW);
+  cmd_stop(pub_cmdFW);
+  cmd_stop(pub_cmdBW);
+  cmd_stop(pub_cmdLH);
+  cmd_stop(pub_cmdRH);
+  cmd_stop(pub_cmdFH);
+  cmd_stop(pub_cmdBH);
   ROS_INFO_STREAM("==== MASTER STOPPED ====");
 
   ros::Duration(2).sleep(); // makes sure the stop is published
