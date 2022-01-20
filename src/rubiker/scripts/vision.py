@@ -72,7 +72,9 @@ def main(gamma, coords):
           dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
           hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
           px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
-          # rospy.loginfo("\t" +str(px_hsv[0]) + "\t" + str(px_hsv[1]) + "\t" + str(px_hsv[2]))
+          px_hsv[0] /= 360.0
+          px_hsv[1] /= 255.0
+          px_hsv[2] /= 255.0
 
           interpreter_in = np.array([px_hsv], dtype='float32')
           interpreter.set_tensor(interpreter_in_idx, interpreter_in)
@@ -98,7 +100,7 @@ def main(gamma, coords):
   kociemba_input = ""
   for f in range(6):
     for i in range(8, -1, -1):
-	      kociemba_input += color_to_pos[colors[f][i]-1]
+      kociemba_input += color_to_pos[colors[f][i]-1]
 
   kociemba_output =  kociemba.solve(kociemba_input)
   kociemba_output = kociemba_output.split(" ")
