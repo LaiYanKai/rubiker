@@ -5,6 +5,6 @@ export ROS_MASTER_URI=http://localhost:11311
 export ROS_HOSTNAME=localhost
 
 # 		Gamma	Coords
-export Vision="	0.6	90,65 155,65 220,65 85,125 155,125 225,125 80,185 155,185 230,185"
+export Vision="	0.6	95,90 155,90 220,90 90,150 155,150 225,150 85,210 155,210 230,210"
 
 roslaunch rubiker test_vision.launch

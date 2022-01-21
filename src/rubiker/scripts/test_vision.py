@@ -20,31 +20,36 @@ def main(gamma, coords):
 
   c = 0;
   while (True):
-    rospy.loginfo(str(c) + " takes done. Key in color num and ENTER, or CTRL+C to stop the program")
-    face_color = int(input())
+    rospy.loginfo(str(c) + " takes done. Key in color num and ENTER, or q  to stop the program")
+    try:
+      face_color = int(input())
+    except:
+      rospy.loginfo("Quiting...")
+      return
+    
     if (rospy.is_shutdown()):
     	break;
     rospy.loginfo("Capturing face color " + str(face_color) + " for " + str(num_burst) + " times")
 
     for b in range(num_burst):
       success, bgr_frame = cap.read()
-			if success:
-			  # Gamma correction
-			  bgr_frame = cv2.LUT(bgr_frame, lookUpTable)
+      if success:
+        # Gamma correction
+        bgr_frame = cv2.LUT(bgr_frame, lookUpTable)
 
-			  # Capture facelets
-				for i in range(9):
-					#frame, center_coords, radius, color, thickness
-					dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
-					hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
-					px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
-					rospy.loginfo("\t" +str(px_hsv[0]) + "\t" + str(px_hsv[1]) + "\t" + str(px_hsv[2]))
-					f_csv.writelines(str(px_hsv[0]) + "," + str(px_hsv[1]) + "," + str(px_hsv[2]) + "," + str(face_color))
+        # Capture facelets
+        for i in range(9):
+          #frame, center_coords, radius, color, thickness
+          dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
+          hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
+          px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
+          rospy.loginfo("\t" +str(px_hsv[0]) + "\t" + str(px_hsv[1]) + "\t" + str(px_hsv[2]))
+          f_csv.write(str(px_hsv[0]) + "," + str(px_hsv[1]) + "," + str(px_hsv[2]) + "," + str(face_color) + "\n")
 
-				cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
-			else:
-				rospy.logwarn("Face capture FAILED")
-		c += 1
+          cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
+      else:
+        rospy.logwarn("Face capture FAILED")
+    c += 1
 
   f_csv.close()
   

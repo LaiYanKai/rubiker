@@ -15,7 +15,7 @@ export MotorRW="RW	17	27	21	20	1.5	0.001	2	5	40 0" #M1
 #		Instructions	WRISTAW	H{OC}	TIMEOUT	OFFW{LRFB}	PTIME	CAL{DST}
 export master="	pC		270	20 330	1.00	90 90 90 90	0.9	150 30 0.5"
 #		Gamma	Coords
-export Vision="	0.6	90,65 155,65 220,65 85,125 155,125 225,125 80,185 155,185 230,185"
+export Vision="	0.6	95,90 155,90 220,90 90,150 155,150 225,150 85,210 155,210 230,210"
 
 #bdLFt
 #BfTlRF -- 13 s

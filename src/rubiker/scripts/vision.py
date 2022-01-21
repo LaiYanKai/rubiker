@@ -37,7 +37,7 @@ def main(gamma, coords):
 
 
   rate = rospy.Rate(5);
- # br = CvBridge()
+  # br = CvBridge()
   lookUpTable = np.empty((1,256), np.uint8)
   for i in range(256):
     lookUpTable[0,i] = np.clip(pow(i / 255.0, gamma) * 255.0, 0, 255)
