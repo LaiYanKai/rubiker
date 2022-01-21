@@ -274,10 +274,10 @@ int main(int argc, char **argv) {
     cmd_pos(pub_cmd, HAND, 100, false, 'c');
     wait_ack_timeout(pub_cmd, ack, TIMEOUT, 'c');
     if(HAND == HANDOPEN){
-        cmd_on(pub_cmd, -20);
+        cmd_on(pub_cmd, -5);
         wait_ack(ack);
     }else{
-        cmd_on(pub_cmd, 20);
+        cmd_on(pub_cmd, 5);
         wait_ack(ack);
     }
   };

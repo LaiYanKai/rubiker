@@ -72,11 +72,12 @@ def main(gamma, coords):
           dbg_frame = cv2.circle(bgr_frame, coords[i], 5, (100,255,100), 2)
           hsv_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
           px_hsv = hsv_frame[coords[i][1], coords[i][0], :]
-          px_hsv[0] /= 360.0
-          px_hsv[1] /= 255.0
-          px_hsv[2] /= 255.0
+          h = float(px_hsv[0]) / 360.0
+          s = float(px_hsv[1]) / 255.0
+          v = float(px_hsv[2]) / 255.0
+          rospy.loginfo((h,s,v))
 
-          interpreter_in = np.array([px_hsv], dtype='float32')
+          interpreter_in = np.array([[h,s,v]], dtype='float32')
           interpreter.set_tensor(interpreter_in_idx, interpreter_in)
           interpreter.invoke()
           interpreter_out = interpreter.get_tensor(interpreter_out_idx)
@@ -95,7 +96,7 @@ def main(gamma, coords):
     pub.publish("1")
 
     # Save the image file
-    # cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
+    cv2.imwrite("/home/ubuntu/frame.jpg",dbg_frame)
 
   kociemba_input = ""
   for f in range(6):
